@@ -4,11 +4,12 @@
 - `npm run dev` · servidor local Vite
 - `npm test` · Vitest (motor fiscal + import/export)
 - `npm run build` · `tsc -b && vite build` → `dist/`
-- `npm run deploy` · build + `wrangler deploy` (requiere `wrangler login` o `CLOUDFLARE_API_TOKEN`)
+- `npm run deploy` · `wrangler deploy` (compila automáticamente vía `build.command`) (requiere `wrangler login` o `CLOUDFLARE_API_TOKEN`)
 
 ## Cloudflare
 - `WORKER_NAME`: `isr-calc`
-- `CONFIG`: `wrangler.jsonc` → `assets.directory=./dist`, `not_found_handling=single-page-application`
+- `NODE`: 22 (`.node-version`)
+- `CONFIG`: `wrangler.jsonc` → `build.command=npm run build`, `assets.directory=./dist`, `not_found_handling=single-page-application`
 - `URL`: pendiente (workers.dev tras primer deploy)
 
 ## QA
