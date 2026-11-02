@@ -9,7 +9,7 @@
 ## Cloudflare
 - `WORKER_NAME`: `isr-calc`
 - `NODE`: 22 (`.node-version`)
-- `CONFIG`: `wrangler.jsonc` → `build.command=npm run build`, `assets.directory=./dist`, `not_found_handling=single-page-application`
+- `CONFIG`: `wrangler.jsonc` → `build.command=npm run build`, `assets.directory=./dist`, `not_found_handling=single-page-application`, `previews={}` (requerido por `wrangler preview` en builds de PR)
 - `URL`: pendiente (workers.dev tras primer deploy)
 
 ## QA
