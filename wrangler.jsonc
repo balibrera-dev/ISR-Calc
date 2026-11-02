@@ -1,0 +1,16 @@
+{
+  // Cloudflare Worker "isr-calc": sirve la SPA como archivos estáticos (sin backend).
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "isr-calc",
+  "compatibility_date": "2026-10-01",
+  // Compila la SPA antes de cada deploy/upload (local y en Workers Builds), así dist/ siempre existe.
+  "build": {
+    "command": "npm run build"
+  },
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "single-page-application"
+  },
+  // Requerido por `wrangler preview` (builds de ramas que no son producción en Workers Builds).
+  "previews": {}
+}
