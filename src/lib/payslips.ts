@@ -88,6 +88,17 @@ export function payslipAlerts(list: Transaction[], s: TaxSummary, rules: YearRul
     rules.year,
   );
   const diff = round2(withheld - expected);
+  // Sin boletas de diciembre el año no está completo: la tabla anual da menos impuesto que lo que la
+  // empresa retiene mes a mes (y el recálculo de diciembre aún no ocurre), así que no se compara.
+  const lastMonth = Math.max(...salaries.map((t) => Number(t.date.slice(5, 7))));
+  if (lastMonth < 12) {
+    alerts.push({
+      level: 'info',
+      title: 'Renta: año sin cerrar',
+      detail: `Llevas ${money(withheld)} retenidos hasta ${MONTHS[lastMonth - 1]}. La comparación con las tablas se hace con el año completo, porque en junio y diciembre la empresa recalcula la renta y ajusta la retención.`,
+    });
+    return alerts;
+  }
   alerts.push(
     Math.abs(diff) <= WITHHOLDING_TOLERANCE
       ? {

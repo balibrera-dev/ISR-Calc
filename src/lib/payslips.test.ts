@@ -58,3 +58,12 @@ describe('payslipAlerts', () => {
     expect(check(list).map((x) => x.title)).toEqual(['Te retuvieron renta de más']);
   });
 });
+
+describe('payslipAlerts on an unfinished year', () => {
+  it('does not compare withholding before December', () => {
+    const list = Array.from({ length: 10 }, (_, i) => sal(`2024-${String(i + 1).padStart(2, '0')}-28`, 1500, { taxWithheld: 120 }));
+    const a = check(list);
+    expect(a.map((x) => [x.level, x.title])).toEqual([['info', 'Renta: año sin cerrar']]);
+    expect(a[0].detail).toContain('$1,200.00');
+  });
+});
