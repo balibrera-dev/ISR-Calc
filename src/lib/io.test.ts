@@ -112,3 +112,15 @@ describe('aguinaldo type', () => {
     expect(transactions[0].type).toBe('AGUINALDO');
   });
 });
+
+describe('indemnización import', () => {
+  it('reads type aliases and the optional years / salary columns', () => {
+    const { transactions } = rowsToTransactions([
+      { Fecha: '2022-06-30', Tipo: 'Indemnización', 'Monto Bruto': 3600, 'Años de servicio': 3, 'Salario base': 1200 },
+      { Fecha: '2022-06-30', Tipo: 'Liquidación', 'Monto Bruto': 100 },
+    ]);
+    expect(transactions[0]).toMatchObject({ type: 'INDEMNIZACION', serviceYears: 3, baseSalary: 1200 });
+    expect(transactions[1].type).toBe('INDEMNIZACION');
+    expect(transactions[1].serviceYears).toBeUndefined();
+  });
+});

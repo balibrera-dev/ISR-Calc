@@ -13,6 +13,8 @@ export const COLUMNS: { header: string; key: keyof Transaction }[] = [
   { header: 'ISSS', key: 'isssAmount' },
   { header: 'AFP', key: 'afpAmount' },
   { header: 'Vialidad', key: 'vialidadAmount' },
+  { header: 'Años de servicio', key: 'serviceYears' },
+  { header: 'Salario base', key: 'baseSalary' },
   { header: 'Renta Retenida', key: 'taxWithheld' },
   { header: 'Comentario', key: 'comment' },
   { header: 'ID', key: 'id' },
@@ -49,6 +51,8 @@ function toRows(list: Transaction[]) {
       ISSS: t.isssAmount ?? '',
       AFP: t.afpAmount ?? '',
       Vialidad: t.vialidadAmount ?? '',
+      'Años de servicio': t.serviceYears ?? '',
+      'Salario base': t.baseSalary ?? '',
       'Renta Retenida': t.taxWithheld,
       Comentario: t.comment ?? '',
       ID: t.id,
@@ -67,6 +71,9 @@ function summaryRows(s: TaxSummary, year: number) {
     ['Aguinaldo recibido', s.totalAguinaldo],
     ['Aguinaldo exento (tope del año)', s.exemptAguinaldo],
     ['Aguinaldo gravado (excedente)', s.taxableAguinaldo],
+    ['Indemnización recibida', s.totalIndemnizacion],
+    ['Indemnización exenta (Art. 4 num. 3)', s.exemptIndemnizacion],
+    ['Indemnización gravada (excedente)', s.taxableIndemnizacion],
     ['Honorarios brutos', s.totalIndependentFees],
     ['(-) Deducción fija asalariados (≤ $9,100)', s.fixedSalaryDeduction],
     ['Gastos médicos (facturados)', s.grossDeductibleMedical],
@@ -96,7 +103,7 @@ function legendRows() {
 export function exportXlsx(list: Transaction[], summaries: [number, TaxSummary][]) {
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.json_to_sheet(toRows(list), { header: COLUMNS.map((c) => c.header) });
-  ws['!cols'] = [12, 32, 20, 14, 13, 10, 10, 10, 15, 36, 38, 26].map((wch) => ({ wch }));
+  ws['!cols'] = [12, 32, 20, 14, 13, 10, 10, 10, 16, 13, 15, 36, 38, 26].map((wch) => ({ wch }));
   XLSX.utils.book_append_sheet(wb, ws, 'Transacciones');
   for (const [year, summary] of [...summaries].sort((a, b) => b[0] - a[0])) {
     const sum = XLSX.utils.aoa_to_sheet(summaryRows(summary, year));

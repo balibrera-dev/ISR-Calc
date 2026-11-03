@@ -86,6 +86,19 @@ export default function SummaryPanel({ summary: s, rules }: { summary: TaxSummar
             <hr className="my-2 border-slate-200 dark:border-slate-800" />
           </>
         )}
+        {s.totalIndemnizacion > 0 && (
+          <>
+            <Row label="Indemnización recibida" value={s.totalIndemnizacion} />
+            <Row
+              label="Indemnización exenta"
+              sub="Art. 4 num. 3: 30 días de salario por año de servicio"
+              value={s.exemptIndemnizacion}
+              negative
+            />
+            <Row label="Indemnización gravada (excedente)" value={s.taxableIndemnizacion} strong />
+            <hr className="my-2 border-slate-200 dark:border-slate-800" />
+          </>
+        )}
         <Row label="Honorarios brutos" value={s.totalIndependentFees} strong />
         <hr className="my-2 border-slate-200 dark:border-slate-800" />
         <Row

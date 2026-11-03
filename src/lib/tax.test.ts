@@ -136,3 +136,25 @@ describe('fixed $1,600 salaried deduction', () => {
     expect(computeSummary([tx({ grossAmount: 5000 }), tx({ type: 'INDEPENDENT_FEES', grossAmount: 100 })]).fixedSalaryDeduction).toBe(0);
   });
 });
+
+describe('indemnización', () => {
+  const ind = (p: Partial<Transaction>) => tx({ type: 'INDEMNIZACION', date: '2022-06-30', ...p });
+
+  it('is fully exempt when years or salary are missing (legal indemnización)', () => {
+    const s = computeSummary([tx({ grossAmount: 14000, date: '2022-12-31' }), ind({ grossAmount: 4000 })], 2022);
+    expect(s.totalIndemnizacion).toBe(4000);
+    expect(s.exemptIndemnizacion).toBe(4000);
+    expect(s.taxableIndemnizacion).toBe(0);
+    expect(s.taxableIncome).toBe(14000);
+  });
+
+  it('taxes only what exceeds 30 days of salary per year of service', () => {
+    const s = computeSummary(
+      [tx({ grossAmount: 14000, date: '2022-12-31' }), ind({ grossAmount: 5000, serviceYears: 3, baseSalary: 1200 })],
+      2022,
+    );
+    expect(s.exemptIndemnizacion).toBe(3600);
+    expect(s.taxableIndemnizacion).toBe(1400);
+    expect(s.taxableIncome).toBe(15400);
+  });
+});

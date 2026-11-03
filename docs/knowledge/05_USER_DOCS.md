@@ -10,6 +10,11 @@
 - Topes: 2021 $1,100; 2022–2026 $1,500 (decretos transitorios). Otros años usan la ley base (2 salarios mínimos de comercio) y se marcan "por confirmar".
 - Si tu aguinaldo no pasa del tope, no suma nada a tu renta imponible; igual conviene registrarlo para tener el historial completo.
 
+## Indemnización por despido
+- Regístrala con el tipo **Indemnización por despido**. Normalmente no paga renta: está exenta hasta 30 días de salario por cada año de servicio, y la indemnización legal completa cabe en ese tope.
+- Si llenas años de servicio y salario mensual base, la app calcula el tope y grava solo el excedente. Si los dejas vacíos, la toma como exenta completa.
+- Lo demás de la liquidación va aparte: vacaciones proporcionales como salario, aguinaldo proporcional como Aguinaldo.
+
 ## Importar / exportar
 - Exportar: **Excel** con todas las transacciones + una hoja `Resumen AAAA` por año + Códigos; **CSV** con todas las transacciones. Úsalo como respaldo (los datos viven solo en el navegador).
 - Importar `.xlsx` / `.csv`. Columnas: `Fecha, Concepto, Tipo, Monto Bruto, Frecuencia, ISSS, AFP, Vialidad, Renta Retenida, Comentario, ID, Creado` (también acepta `Comment`).

@@ -11,6 +11,10 @@ const strip = (s: string) =>
 
 const TYPE_ALIASES: Record<string, TransactionType> = {
   aguinaldo: 'AGUINALDO',
+  indemnizacion: 'INDEMNIZACION',
+  'indemnizacion por despido': 'INDEMNIZACION',
+  despido: 'INDEMNIZACION',
+  liquidacion: 'INDEMNIZACION',
   salario: 'SALARY_FORMAL',
   'salario (planilla)': 'SALARY_FORMAL',
   planilla: 'SALARY_FORMAL',
@@ -128,6 +132,12 @@ export function normalizeTransaction(
     t.afpAmount = round2(Math.max(0, parseNumber(raw.afpAmount) ?? 0));
     const vialidad = parseNumber(raw.vialidadAmount);
     if (vialidad) t.vialidadAmount = round2(Math.max(0, vialidad));
+  }
+  if (type === 'INDEMNIZACION') {
+    const years = parseNumber(raw.serviceYears);
+    const salary = parseNumber(raw.baseSalary);
+    if (years && years > 0) t.serviceYears = round2(years);
+    if (salary && salary > 0) t.baseSalary = round2(salary);
   }
   return { ok: true, value: t };
 }

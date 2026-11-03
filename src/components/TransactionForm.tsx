@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Plus, Save, Wand2 } from 'lucide-react';
 import type { FrequencyType, Transaction, TransactionType } from '../types';
 import { FREQUENCY_LABELS, TRANSACTION_TYPE_LABELS } from '../types';
-import { round2, suggestSocialSecurity } from '../lib/tax';
+import { indemnizacionCap, round2, suggestSocialSecurity } from '../lib/tax';
 import { aguinaldoRuleFor } from '../lib/rules';
 import { money } from '../lib/format';
 import { newId, todayISO } from '../lib/format';
@@ -26,6 +26,8 @@ interface FormState {
   isssAmount: string;
   afpAmount: string;
   vialidadAmount: string;
+  serviceYears: string;
+  baseSalary: string;
   taxWithheld: string;
   comment: string;
   autoSS: boolean;
@@ -40,6 +42,8 @@ const emptyState = (prev?: Partial<FormState>): FormState => ({
   isssAmount: '',
   afpAmount: '',
   vialidadAmount: '',
+  serviceYears: '',
+  baseSalary: '',
   taxWithheld: '',
   comment: '',
   autoSS: true,
@@ -54,6 +58,8 @@ const fromTx = (t: Transaction): FormState => ({
   isssAmount: t.isssAmount !== undefined ? String(t.isssAmount) : '',
   afpAmount: t.afpAmount !== undefined ? String(t.afpAmount) : '',
   vialidadAmount: t.vialidadAmount ? String(t.vialidadAmount) : '',
+  serviceYears: t.serviceYears ? String(t.serviceYears) : '',
+  baseSalary: t.baseSalary ? String(t.baseSalary) : '',
   taxWithheld: String(t.taxWithheld),
   comment: t.comment ?? '',
   autoSS: false,
@@ -78,6 +84,8 @@ export default function TransactionForm({ editing, defaultDate, onSave, onCancel
 
   const isSalary = f.type === 'SALARY_FORMAL';
   const isDeductible = f.type === 'DEDUCTIBLE_MEDICAL' || f.type === 'DEDUCTIBLE_EDU';
+  const isAguinaldo = f.type === 'AGUINALDO';
+  const isIndemnizacion = f.type === 'INDEMNIZACION';
 
   const set = <K extends keyof FormState>(k: K, v: FormState[K]) =>
     setF((prev) => {
@@ -103,7 +111,10 @@ export default function TransactionForm({ editing, defaultDate, onSave, onCancel
     if (!f.date) return setError('Ingresa la fecha.');
     if (!Number.isFinite(gross) || gross <= 0) return setError('El monto bruto debe ser mayor que $0.00.');
     const withheld = isDeductible ? 0 : num(f.taxWithheld);
-    if (withheld < 0 || num(f.isssAmount) < 0 || num(f.afpAmount) < 0 || num(f.vialidadAmount) < 0)
+    if (
+      withheld < 0 ||
+      [f.isssAmount, f.afpAmount, f.vialidadAmount, f.serviceYears, f.baseSalary].some((v) => num(v) < 0)
+    )
       return setError('Los montos no pueden ser negativos.');
 
     const tx: Transaction = {
@@ -122,16 +133,24 @@ export default function TransactionForm({ editing, defaultDate, onSave, onCancel
       tx.afpAmount = round2(num(f.afpAmount));
       if (num(f.vialidadAmount) > 0) tx.vialidadAmount = round2(num(f.vialidadAmount));
     }
+    if (isIndemnizacion) {
+      if (num(f.serviceYears) > 0) tx.serviceYears = round2(num(f.serviceYears));
+      if (num(f.baseSalary) > 0) tx.baseSalary = round2(num(f.baseSalary));
+    }
     onSave(tx, keep);
     setError(null);
     if (!editing) setF((prev) => emptyState(prev));
   };
 
-  const isAguinaldo = f.type === 'AGUINALDO';
   const conceptLabel =
-    isSalary || isAguinaldo ? 'Empleador' : f.type === 'INDEPENDENT_FEES' ? 'Cliente / concepto' : 'Proveedor / concepto';
+    isSalary || isAguinaldo || isIndemnizacion ? 'Empleador' : f.type === 'INDEPENDENT_FEES' ? 'Cliente / concepto' : 'Proveedor / concepto';
   const agYear = Number(f.date.slice(0, 4)) || new Date().getFullYear();
   const agRule = aguinaldoRuleFor(agYear);
+  const indCap = indemnizacionCap({ serviceYears: num(f.serviceYears), baseSalary: num(f.baseSalary) });
+  const indHint =
+    indCap === null
+      ? 'Sin años y salario se asume la indemnización legal: exenta completa.'
+      : `Exenta hasta ${money(indCap)}; el excedente paga renta.`;
   const agHint = `Exento hasta ${money(agRule.cap)} en ${agYear}${agRule.verified ? '' : ' (por confirmar)'}; el excedente paga renta.`;
 
   return (
@@ -154,7 +173,7 @@ export default function TransactionForm({ editing, defaultDate, onSave, onCancel
               className={inputCls}
               value={f.concept}
               onChange={(e) => set('concept', e.target.value)}
-              placeholder={isSalary || isAguinaldo ? 'Ej. Empresa S.A. de C.V.' : isDeductible ? 'Ej. Hospital / Colegio' : 'Ej. Cliente XYZ'}
+              placeholder={isSalary || isAguinaldo || isIndemnizacion ? 'Ej. Empresa S.A. de C.V.' : isDeductible ? 'Ej. Hospital / Colegio' : 'Ej. Cliente XYZ'}
               maxLength={120}
             />
           </Field>
@@ -189,7 +208,7 @@ export default function TransactionForm({ editing, defaultDate, onSave, onCancel
         ) : !isDeductible ? (
           <Field
             label="Renta retenida ($)"
-            hint={isAguinaldo ? agHint : 'Usualmente 10% en servicios profesionales.'}
+            hint={isAguinaldo ? agHint : isIndemnizacion ? indHint : 'Usualmente 10% en servicios profesionales.'}
           >
             <input
               type="number"
@@ -206,6 +225,39 @@ export default function TransactionForm({ editing, defaultDate, onSave, onCancel
           <p className="self-end pb-2 text-xs text-slate-500">
             Se deduce hasta $800.00 anuales por cada categoría (médico y educativo).
           </p>
+        )}
+
+        {isIndemnizacion && (
+          <>
+            <Field label="Años de servicio (opcional)">
+              <input
+                type="number"
+                inputMode="decimal"
+                min="0"
+                step="0.01"
+                className={inputCls}
+                value={f.serviceYears}
+                onChange={(e) => set('serviceYears', e.target.value)}
+                placeholder="Ej. 3.5"
+              />
+            </Field>
+            <Field label="Salario mensual base ($, opcional)" hint="Promedio de los últimos 12 meses.">
+              <input
+                type="number"
+                inputMode="decimal"
+                min="0"
+                step="0.01"
+                className={inputCls}
+                value={f.baseSalary}
+                onChange={(e) => set('baseSalary', e.target.value)}
+                placeholder="0.00"
+              />
+            </Field>
+            <p className="text-xs text-slate-500 sm:col-span-2">
+              Registra aquí solo la indemnización. Si la liquidación trae vacaciones proporcionales, van como
+              salario; el aguinaldo proporcional va como Aguinaldo.
+            </p>
+          </>
         )}
 
         {isSalary && (

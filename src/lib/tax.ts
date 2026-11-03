@@ -55,6 +55,17 @@ export function suggestSocialSecurity(gross: number, frequency: FrequencyType) {
 export const txYear = (t: Pick<Transaction, 'date'>) => Number(t.date.slice(0, 4));
 
 /**
+ * Art. 4 num. 3 LISR: la indemnización por despido es exenta hasta 30 días de salario básico por
+ * año de servicio. Sin años o salario se asume la indemnización legal (Código de Trabajo Art. 58),
+ * que cabe completa en ese tope.
+ */
+export function indemnizacionCap(t: Pick<Transaction, 'serviceYears' | 'baseSalary'>): number | null {
+  const years = Number(t.serviceYears) || 0;
+  const salary = Number(t.baseSalary) || 0;
+  return years > 0 && salary > 0 ? round2(years * salary) : null;
+}
+
+/**
  * @param year ejercicio fiscal; define qué tabla del Art. 37 se usa. Sin año (vista "todos los años") usa la vigente.
  */
 export function computeSummary(transactions: Transaction[], year?: number): TaxSummary {
@@ -65,6 +76,8 @@ export function computeSummary(transactions: Transaction[], year?: number): TaxS
   let totalAFP = 0;
   let totalVialidad = 0;
   let totalIndependentFees = 0;
+  let totalIndemnizacion = 0;
+  let exemptIndemnizacion = 0;
   let grossDeductibleMedical = 0;
   let grossDeductibleEdu = 0;
   let totalTaxWithheld = 0;
@@ -81,6 +94,12 @@ export function computeSummary(transactions: Transaction[], year?: number): TaxS
       case 'AGUINALDO':
         aguinaldoByYear.set(txYear(t), (aguinaldoByYear.get(txYear(t)) ?? 0) + amount);
         break;
+      case 'INDEMNIZACION': {
+        const cap = indemnizacionCap(t);
+        totalIndemnizacion += amount;
+        exemptIndemnizacion += cap === null ? amount : Math.min(amount, cap);
+        break;
+      }
       case 'INDEPENDENT_FEES':
         totalIndependentFees += amount;
         break;
@@ -102,12 +121,13 @@ export function computeSummary(transactions: Transaction[], year?: number): TaxS
     exemptAguinaldo += Math.min(v, rulesForYear(y).aguinaldoCap);
   });
   const taxableAguinaldo = totalAguinaldo - exemptAguinaldo;
+  const taxableIndemnizacion = totalIndemnizacion - exemptIndemnizacion;
   const netSalarySubjectToTax = Math.max(0, totalGrossSalary - totalISSS - totalAFP);
   // Art. 29 num. 7: solo salarios y ≤ $9,100 → deducción fija de $1,600 (en lugar de médicos/educativos).
   const qualifiesFixed =
     totalIndependentFees === 0 &&
     totalGrossSalary + totalAguinaldo > 0 &&
-    totalGrossSalary + taxableAguinaldo <= rules.fixedSalaryDeductionLimit;
+    totalGrossSalary + taxableAguinaldo + taxableIndemnizacion <= rules.fixedSalaryDeductionLimit;
   const fixedSalaryDeduction = qualifiesFixed ? rules.fixedSalaryDeduction : 0;
   const appliedDeductibleMedical = qualifiesFixed ? 0 : Math.min(grossDeductibleMedical, rules.medicalCap);
   const appliedDeductibleEdu = qualifiesFixed ? 0 : Math.min(grossDeductibleEdu, rules.eduCap);
@@ -115,6 +135,7 @@ export function computeSummary(transactions: Transaction[], year?: number): TaxS
     0,
     netSalarySubjectToTax +
       taxableAguinaldo +
+      taxableIndemnizacion +
       totalIndependentFees -
       fixedSalaryDeduction -
       appliedDeductibleMedical -
@@ -130,6 +151,9 @@ export function computeSummary(transactions: Transaction[], year?: number): TaxS
     totalAguinaldo: round2(totalAguinaldo),
     exemptAguinaldo: round2(exemptAguinaldo),
     taxableAguinaldo: round2(taxableAguinaldo),
+    totalIndemnizacion: round2(totalIndemnizacion),
+    exemptIndemnizacion: round2(exemptIndemnizacion),
+    taxableIndemnizacion: round2(taxableIndemnizacion),
     fixedSalaryDeduction,
     netSalarySubjectToTax: round2(netSalarySubjectToTax),
     totalIndependentFees: round2(totalIndependentFees),

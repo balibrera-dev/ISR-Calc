@@ -112,6 +112,13 @@ const BASE_NOTES: LegalNote[] = [
   },
   {
     kind: 'ley',
+    title: 'Art. 4 num. 3 LISR: indemnización por despido',
+    detail:
+      'No paga renta hasta 30 días de salario básico por cada año de servicio (salario promedio de los últimos 12 meses). La indemnización legal completa cabe en ese tope. Las vacaciones proporcionales de la liquidación sí son salario gravado, y el aguinaldo proporcional va como Aguinaldo.',
+    source: SRC.art4,
+  },
+  {
+    kind: 'ley',
     title: 'Obligación de declarar',
     detail: 'Asalariados con ingresos de $60,000 o menos declaran solo si les toca pagar o si quieren su devolución.',
     source: SRC.guiaMH,

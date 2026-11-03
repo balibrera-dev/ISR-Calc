@@ -23,8 +23,8 @@
 - `FLOW`: rama por feature -> PR -> `main`
 
 ## Modelo de datos (`src/types.ts`)
-- `Transaction`: id, date (YYYY-MM-DD), concept, type, grossAmount, frequency?, isssAmount?, afpAmount?, vialidadAmount?, taxWithheld, comment?, createdAt
-- `TransactionType`: SALARY_FORMAL | INDEPENDENT_FEES | AGUINALDO | DEDUCTIBLE_MEDICAL | DEDUCTIBLE_EDU
+- `Transaction`: id, date (YYYY-MM-DD), concept, type, grossAmount, frequency?, isssAmount?, afpAmount?, vialidadAmount?, serviceYears?, baseSalary?, taxWithheld, comment?, createdAt
+- `TransactionType`: SALARY_FORMAL | INDEPENDENT_FEES | AGUINALDO | INDEMNIZACION | DEDUCTIBLE_MEDICAL | DEDUCTIBLE_EDU
 - `FrequencyType`: CATORCENAL | QUINCENAL | MENSUAL | UNICO (aguinaldo, bonos únicos)
 - `TaxSummary`: ver `src/types.ts`
 
@@ -43,6 +43,7 @@
 - `R-TAX-03`: Saldo = impuesto − total retenido (>0 pagar, <0 devolución)
 - `R-TAX-04`: ISSS sugerido 3% con tope salario $1,000/mes ($30/mes); AFP sugerido 7.25% sin tope. Ambos editables.
 - `R-TAX-07`: Aguinaldo es su propio tipo (`AGUINALDO`). Exento hasta el tope de su año (`aguinaldoRuleFor` en `src/lib/rules.ts`): decretos transitorios 2021 $1,100; 2022–2026 $1,500. Sin decreto aplica Art. 4 num. 16 LISR = 2 salarios mínimos de comercio (2020: $608.34; 2027+: $817.60), marcado "por confirmar". Solo el excedente se suma a la renta imponible. Import convierte a AGUINALDO las filas de salario `UNICO` cuyo concepto/comentario dice "aguinaldo" o con columna `Aguinaldo` = Sí (también migra datos guardados con el viejo flag `isAguinaldo`). Nota: NO es "60 días de salario".
+- `R-TAX-08`: Indemnización por despido (`INDEMNIZACION`), Art. 4 num. 3 LISR: exenta hasta 30 días de salario básico por año de servicio (`indemnizacionCap` en `src/lib/tax.ts` = años × salario mensual). Sin años o salario se asume la indemnización legal (C. Trabajo Art. 58), exenta completa. Solo el excedente se suma a la renta imponible. Vacaciones proporcionales van como salario; aguinaldo proporcional como Aguinaldo.
 - `R-TAX-08`: Deducción fija $1,600 solo si los ingresos son exclusivamente salarios y ≤ $9,100 (Art. 29 num. 7); reemplaza médicos/educativos.
 - `R-TAX-09` (explicación): tablas de retención asumen la deducción de $1,600 → en tramo III el F11 queda ~$320 (20% × $1,600) arriba de lo retenido para asalariados > $9,100.
 - `R-TAX-06`: Vialidad se registra y totaliza (`totalVialidad`) pero NO reduce la renta imponible
