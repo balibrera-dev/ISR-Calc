@@ -112,6 +112,7 @@ export function payslipAlerts(list: Transaction[], s: TaxSummary, rules: YearRul
   const expected = computeAnnualTax(
     Math.max(0, s.netSalarySubjectToTax + s.taxableAguinaldo + s.taxableIndemnizacion - rules.fixedSalaryDeduction),
     rules.year,
+    rules.tableId,
   );
   const diff = round2(withheld - expected);
   // Sin boletas de diciembre el año no está completo: la tabla anual da menos impuesto que lo que la

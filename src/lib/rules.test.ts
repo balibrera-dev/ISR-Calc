@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { aguinaldoRuleFor, rulesForYear } from './rules';
+import { computeAnnualTax } from './tax';
 
 describe('rulesForYear', () => {
   it('uses the 2011 table before 2025 and the reformed one after', () => {
@@ -23,5 +24,22 @@ describe('aguinaldoRuleFor', () => {
     expect(aguinaldoRuleFor(2024)).toMatchObject({ cap: 1500, verified: true });
     expect(aguinaldoRuleFor(2020)).toMatchObject({ cap: 608.34, verified: false });
     expect(aguinaldoRuleFor(2027)).toMatchObject({ cap: 817.6, verified: false });
+  });
+});
+
+describe('mid-year table change', () => {
+  it('offers three ways to compute 2025 and one for other years', () => {
+    expect(rulesForYear(2024).tableOptions).toHaveLength(1);
+    expect(rulesForYear(2025).tableOptions.map((o) => o.id)).toEqual(['nueva', 'proporcional', 'anterior']);
+    expect(rulesForYear(2025).tableId).toBe('nueva');
+    expect(rulesForYear(2025, 'anterior').brackets[0].hasta).toBe(4064);
+  });
+
+  it('computes the tax with each option', () => {
+    expect(computeAnnualTax(8000, 2025)).toBeCloseTo(352.12, 2);
+    expect(computeAnnualTax(8000, 2025, 'anterior')).toBeCloseTo(605.72, 2);
+    expect(computeAnnualTax(8000, 2025, 'proporcional')).toBeCloseTo(436.65, 2);
+    // Tramo III no cambió: las tres opciones dan lo mismo.
+    expect(computeAnnualTax(14190.62, 2025, 'proporcional')).toBe(computeAnnualTax(14190.62, 2025));
   });
 });
