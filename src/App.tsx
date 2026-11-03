@@ -1,25 +1,35 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Calculator, FileDown, FileSpreadsheet, FileUp, Moon, Sun, Trash } from 'lucide-react';
+import { Calculator, FileDown, FileSpreadsheet, FileUp, Moon, Plus, Sun, Trash } from 'lucide-react';
 import type { Transaction } from './types';
 import { computeSummary, txYear } from './lib/tax';
+import { rulesForYear } from './lib/rules';
+import { todayISO } from './lib/format';
 import { loadTransactions, saveTransactions, THEME_KEY } from './lib/storage';
 import TransactionForm from './components/TransactionForm';
 import TransactionList from './components/TransactionList';
 import SummaryPanel from './components/SummaryPanel';
-import { btn, inputBase } from './components/ui';
+import LegalPanel from './components/LegalPanel';
+import YearTabs from './components/YearTabs';
+import Dialog from './components/Dialog';
+import { btn } from './components/ui';
 
-type Year = number | 'all';
 type Notice = { kind: 'ok' | 'error'; text: string; details?: string[] };
+/** null = cerrado; 'new' = nueva transacción; Transaction = edición. */
+type DialogState = null | 'new' | Transaction;
+
+const CURRENT_YEAR = new Date().getFullYear();
 
 export default function App() {
   const [transactions, setTransactions] = useState<Transaction[]>(loadTransactions);
-  const [year, setYear] = useState<Year>(() => new Date().getFullYear());
-  const [editing, setEditing] = useState<Transaction | null>(null);
+  const [year, setYear] = useState<number>(CURRENT_YEAR);
+  const [dialog, setDialog] = useState<DialogState>(null);
   const [notice, setNotice] = useState<Notice | null>(null);
   const [dark, setDark] = useState(() => document.documentElement.classList.contains('dark'));
   const fileRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => saveTransactions(transactions), [transactions]);
+  useEffect(() => {
+    saveTransactions(transactions);
+  }, [transactions]);
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', dark);
@@ -36,19 +46,34 @@ export default function App() {
     return () => clearTimeout(id);
   }, [notice]);
 
-  const years = useMemo(() => {
-    const set = new Set<number>([new Date().getFullYear()]);
-    transactions.forEach((t) => set.add(txYear(t)));
-    return [...set].sort((a, b) => b - a);
+  /** Transacciones agrupadas por ejercicio fiscal (año de la fecha). */
+  const byYear = useMemo(() => {
+    const map = new Map<number, Transaction[]>([[CURRENT_YEAR, []]]);
+    for (const t of transactions) {
+      const y = txYear(t);
+      if (!map.has(y)) map.set(y, []);
+      map.get(y)!.push(t);
+    }
+    return map;
   }, [transactions]);
 
-  const visible = useMemo(
-    () => (year === 'all' ? transactions : transactions.filter((t) => txYear(t) === year)),
-    [transactions, year],
-  );
-  const summary = useMemo(() => computeSummary(visible, year === 'all' ? undefined : year), [visible, year]);
+  const years = useMemo(() => [...byYear.keys()].sort((a, b) => a - b), [byYear]);
+  const counts = useMemo(() => new Map([...byYear].map(([y, l]) => [y, l.length])), [byYear]);
 
-  const save = (t: Transaction) => {
+  // Si el año activo se queda sin transacciones (p. ej. al borrarlo), vuelve al año actual.
+  useEffect(() => {
+    if (!byYear.has(year)) setYear(CURRENT_YEAR);
+  }, [byYear, year]);
+
+  const visible = byYear.get(year) ?? [];
+  const rules = useMemo(() => rulesForYear(year), [year]);
+  const summary = useMemo(() => computeSummary(visible, year), [visible, year]);
+
+  const editing = dialog && dialog !== 'new' ? dialog : null;
+  const defaultDate = year === CURRENT_YEAR ? todayISO() : `${year}-12-31`;
+
+  const save = (t: Transaction, keepOpen: boolean) => {
+    const isEdit = transactions.some((x) => x.id === t.id);
     setTransactions((list) => {
       const i = list.findIndex((x) => x.id === t.id);
       if (i === -1) return [...list, t];
@@ -56,22 +81,31 @@ export default function App() {
       copy[i] = t;
       return copy;
     });
-    if (editing) setEditing(null);
-    if (year !== 'all' && txYear(t) !== year) setYear(txYear(t));
-    setNotice({ kind: 'ok', text: editing ? 'Transacción actualizada.' : 'Transacción agregada.' });
+    if (!keepOpen) setDialog(null);
+    if (txYear(t) !== year) setYear(txYear(t));
+    setNotice({
+      kind: 'ok',
+      text: `${isEdit ? 'Transacción actualizada' : 'Transacción agregada'} en el ejercicio ${txYear(t)}.`,
+    });
   };
 
   const remove = (t: Transaction) => {
     if (!confirm(`¿Eliminar "${t.concept || 'transacción'}" por $${t.grossAmount.toFixed(2)}?`)) return;
     setTransactions((list) => list.filter((x) => x.id !== t.id));
-    if (editing?.id === t.id) setEditing(null);
   };
 
-  const clearPeriod = () => {
-    const label = year === 'all' ? 'TODAS las transacciones' : `todas las transacciones de ${year}`;
-    if (!confirm(`¿Eliminar ${label}? Esta acción no se puede deshacer. Exporta un respaldo antes.`)) return;
-    setTransactions((list) => (year === 'all' ? [] : list.filter((t) => txYear(t) !== year)));
-    setEditing(null);
+  const clearYear = () => {
+    if (!confirm(`¿Eliminar todas las transacciones de ${year}? Esta acción no se puede deshacer. Exporta un respaldo antes.`))
+      return;
+    setTransactions((list) => list.filter((t) => txYear(t) !== year));
+  };
+
+  const exportExcel = async () => {
+    const io = await import('./lib/io');
+    io.exportXlsx(
+      transactions,
+      years.filter((y) => counts.get(y)).map((y) => [y, computeSummary(byYear.get(y)!, y)]),
+    );
   };
 
   const onImport = async (file: File) => {
@@ -84,9 +118,10 @@ export default function App() {
       }
       const r = mergeTransactions(transactions, incoming);
       setTransactions(r.list);
+      const importedYears = [...new Set(incoming.map(txYear))].sort();
       setNotice({
         kind: errors.length ? 'error' : 'ok',
-        text: `Importación: ${r.added} nuevas, ${r.updated} actualizadas${errors.length ? `, ${errors.length} filas omitidas` : ''}.`,
+        text: `Importación: ${r.added} nuevas, ${r.updated} actualizadas en ${importedYears.length} ejercicio(s) (${importedYears.join(', ')})${errors.length ? `, ${errors.length} filas omitidas` : ''}.`,
         details: errors,
       });
     } catch {
@@ -99,7 +134,7 @@ export default function App() {
   return (
     <div className="min-h-screen">
       <header className="sticky top-0 z-10 border-b border-slate-200 bg-white/85 backdrop-blur dark:border-slate-800 dark:bg-slate-950/85">
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-3 px-4 py-3">
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-2 px-4 py-3">
           <div className="mr-auto flex items-center gap-2">
             <span className="grid size-9 place-items-center rounded-xl bg-teal-700 text-white">
               <Calculator className="size-5" />
@@ -109,19 +144,10 @@ export default function App() {
               <p className="text-xs text-slate-500">Renta personal · El Salvador</p>
             </div>
           </div>
-          <select
-            className={inputBase}
-            value={year}
-            onChange={(e) => setYear(e.target.value === 'all' ? 'all' : Number(e.target.value))}
-            aria-label="Ejercicio fiscal"
-          >
-            {years.map((y) => (
-              <option key={y} value={y}>
-                Ejercicio {y}
-              </option>
-            ))}
-            <option value="all">Todos los años</option>
-          </select>
+          <button className={btn.primary} onClick={() => setDialog('new')}>
+            <Plus className="size-4" /> <span className="hidden sm:inline">Nueva transacción</span>
+            <span className="sm:hidden">Nueva</span>
+          </button>
           <input
             ref={fileRef}
             type="file"
@@ -130,23 +156,23 @@ export default function App() {
             onChange={(e) => e.target.files?.[0] && onImport(e.target.files[0])}
           />
           <button className={btn.secondary} onClick={() => fileRef.current?.click()} title="Importar .xlsx o .csv">
-            <FileUp className="size-4" /> <span className="hidden sm:inline">Importar</span>
+            <FileUp className="size-4" /> <span className="hidden md:inline">Importar</span>
           </button>
           <button
             className={btn.secondary}
-            onClick={() => import('./lib/io').then((io) => io.exportXlsx(visible, summary, year))}
-            disabled={!visible.length}
-            title="Exportar a Excel"
+            onClick={exportExcel}
+            disabled={!transactions.length}
+            title="Exportar todo a Excel (una hoja de resumen por año)"
           >
-            <FileSpreadsheet className="size-4" /> <span className="hidden sm:inline">Excel</span>
+            <FileSpreadsheet className="size-4" /> <span className="hidden md:inline">Excel</span>
           </button>
           <button
             className={btn.secondary}
-            onClick={() => import('./lib/io').then((io) => io.exportCsv(visible, year))}
-            disabled={!visible.length}
-            title="Exportar a CSV"
+            onClick={() => import('./lib/io').then((io) => io.exportCsv(transactions))}
+            disabled={!transactions.length}
+            title="Exportar todas las transacciones a CSV"
           >
-            <FileDown className="size-4" /> <span className="hidden sm:inline">CSV</span>
+            <FileDown className="size-4" /> <span className="hidden md:inline">CSV</span>
           </button>
           <button
             className={btn.ghost}
@@ -155,6 +181,9 @@ export default function App() {
           >
             {dark ? <Sun className="size-5" /> : <Moon className="size-5" />}
           </button>
+        </div>
+        <div className="mx-auto max-w-7xl px-4">
+          <YearTabs years={years} active={year} counts={counts} onChange={setYear} />
         </div>
       </header>
 
@@ -181,32 +210,48 @@ export default function App() {
         </div>
       )}
 
-      <main className="mx-auto grid max-w-7xl grid-cols-1 gap-6 px-4 py-6 lg:grid-cols-[minmax(0,1fr)_380px]">
+      <main
+        id={`panel-${year}`}
+        role="tabpanel"
+        aria-labelledby={`tab-${year}`}
+        className="mx-auto grid max-w-7xl grid-cols-1 gap-6 px-4 py-6 lg:grid-cols-[minmax(0,1fr)_380px]"
+      >
         <div className="min-w-0 space-y-6">
-          <TransactionForm editing={editing} onSave={save} onCancelEdit={() => setEditing(null)} />
           <TransactionList
             transactions={visible}
             editingId={editing?.id ?? null}
-            onEdit={(t) => {
-              setEditing(t);
-              window.scrollTo({ top: 0, behavior: 'smooth' });
-            }}
+            onEdit={(t) => setDialog(t)}
             onDelete={remove}
           />
+          <LegalPanel rules={rules} taxableIncome={summary.taxableIncome} />
           {visible.length > 0 && (
-            <button className={`${btn.ghost} gap-2 px-2 text-xs`} onClick={clearPeriod}>
-              <Trash className="size-3.5" /> Borrar {year === 'all' ? 'todo' : `ejercicio ${year}`}
+            <button className={`${btn.ghost} gap-2 px-2 text-xs`} onClick={clearYear}>
+              <Trash className="size-3.5" /> Borrar ejercicio {year}
             </button>
           )}
         </div>
-        <aside className="min-w-0 lg:sticky lg:top-20 lg:self-start">
-          <SummaryPanel summary={summary} year={year} />
+        <aside className="order-first min-w-0 lg:sticky lg:top-36 lg:order-none lg:self-start">
+          <SummaryPanel summary={summary} rules={rules} />
         </aside>
       </main>
 
       <footer className="mx-auto max-w-7xl px-4 pb-8 text-xs text-slate-500">
-        Tus datos se guardan solo en este navegador (localStorage). Nada se envía a un servidor.
+        Tus datos se guardan solo en este navegador (localStorage). Nada se envía a un servidor. Exporta a Excel de vez
+        en cuando como respaldo.
       </footer>
+
+      <Dialog
+        open={dialog !== null}
+        title={editing ? 'Editar transacción' : 'Nueva transacción'}
+        onClose={() => setDialog(null)}
+      >
+        <TransactionForm
+          editing={editing}
+          defaultDate={defaultDate}
+          onSave={save}
+          onCancel={() => setDialog(null)}
+        />
+      </Dialog>
     </div>
   );
 }

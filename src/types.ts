@@ -17,8 +17,8 @@ export interface Transaction {
   frequency?: FrequencyType;
   isssAmount?: number;
   afpAmount?: number;
-  vialidadAmount?: number;
-  isAguinaldo?: boolean; // Aguinaldo: exento de renta hasta AGUINALDO_EXEMPT_CAP por año // Contribución de vialidad retenida en planilla (no deducible de renta)
+  vialidadAmount?: number; // Contribución de vialidad retenida en planilla (no deducible de renta)
+  isAguinaldo?: boolean; // Aguinaldo: exento de renta hasta el tope del año (ver rules.ts)
 
   taxWithheld: number;
   comment?: string; // Nota libre del usuario

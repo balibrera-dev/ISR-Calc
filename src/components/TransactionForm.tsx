@@ -1,15 +1,18 @@
-import { useEffect, useState, type FormEvent } from 'react';
-import { Plus, Save, Wand2, X } from 'lucide-react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { Plus, Save, Wand2 } from 'lucide-react';
 import type { FrequencyType, Transaction, TransactionType } from '../types';
 import { FREQUENCY_LABELS, TRANSACTION_TYPE_LABELS } from '../types';
 import { round2, suggestSocialSecurity } from '../lib/tax';
 import { newId, todayISO } from '../lib/format';
-import { Card, Field, btn, inputCls } from './ui';
+import { Field, btn, inputCls } from './ui';
 
 interface Props {
   editing: Transaction | null;
-  onSave: (t: Transaction) => void;
-  onCancelEdit: () => void;
+  /** Fecha inicial para una transacción nueva (según la pestaña activa). */
+  defaultDate: string;
+  /** keepOpen: el usuario eligió "Agregar y otra". */
+  onSave: (t: Transaction, keepOpen: boolean) => void;
+  onCancel: () => void;
 }
 
 interface FormState {
@@ -27,7 +30,7 @@ interface FormState {
   autoSS: boolean;
 }
 
-const emptyState = (prev?: FormState): FormState => ({
+const emptyState = (prev?: Partial<FormState>): FormState => ({
   date: prev?.date ?? todayISO(),
   concept: '',
   type: prev?.type ?? 'SALARY_FORMAL',
@@ -62,13 +65,16 @@ const num = (s: string) => {
   return Number.isFinite(n) ? n : 0;
 };
 
-export default function TransactionForm({ editing, onSave, onCancelEdit }: Props) {
-  const [f, setF] = useState<FormState>(() => (editing ? fromTx(editing) : emptyState()));
+export default function TransactionForm({ editing, defaultDate, onSave, onCancel }: Props) {
+  const [f, setF] = useState<FormState>(() => (editing ? fromTx(editing) : emptyState({ date: defaultDate })));
   const [error, setError] = useState<string | null>(null);
+  const keepOpen = useRef(false);
 
   useEffect(() => {
-    setF(editing ? fromTx(editing) : emptyState());
+    setF(editing ? fromTx(editing) : emptyState({ date: defaultDate }));
     setError(null);
+    // Solo al cambiar de transacción: con "Agregar y otra" se conservan tipo, fecha y frecuencia.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editing]);
 
   const isSalary = f.type === 'SALARY_FORMAL';
@@ -92,6 +98,8 @@ export default function TransactionForm({ editing, onSave, onCancelEdit }: Props
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
+    const keep = keepOpen.current;
+    keepOpen.current = false;
     const gross = Number(f.grossAmount);
     if (!f.date) return setError('Ingresa la fecha.');
     if (!Number.isFinite(gross) || gross <= 0) return setError('El monto bruto debe ser mayor que $0.00.');
@@ -116,7 +124,7 @@ export default function TransactionForm({ editing, onSave, onCancelEdit }: Props
       if (f.isAguinaldo) tx.isAguinaldo = true;
       if (num(f.vialidadAmount) > 0) tx.vialidadAmount = round2(num(f.vialidadAmount));
     }
-    onSave(tx);
+    onSave(tx, keep);
     setError(null);
     if (!editing) setF((prev) => emptyState(prev));
   };
@@ -124,15 +132,6 @@ export default function TransactionForm({ editing, onSave, onCancelEdit }: Props
   const conceptLabel = isSalary ? 'Empleador' : f.type === 'INDEPENDENT_FEES' ? 'Cliente / concepto' : 'Proveedor / concepto';
 
   return (
-    <Card>
-      <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-base font-semibold">{editing ? 'Editar transacción' : 'Nueva transacción'}</h2>
-        {editing && (
-          <button type="button" className={btn.ghost} onClick={onCancelEdit} aria-label="Cancelar edición">
-            <X className="size-4" />
-          </button>
-        )}
-      </div>
       <form onSubmit={submit} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <Field label="Tipo">
           <select className={inputCls} value={f.type} onChange={(e) => set('type', e.target.value as TransactionType)}>
@@ -287,18 +286,20 @@ export default function TransactionForm({ editing, onSave, onCancelEdit }: Props
             {error}
           </p>
         )}
-        <div className="flex gap-2 sm:col-span-2">
+        <div className="flex flex-wrap gap-2 sm:col-span-2">
           <button type="submit" className={`${btn.primary} flex-1`}>
             {editing ? <Save className="size-4" /> : <Plus className="size-4" />}
-            {editing ? 'Guardar cambios' : 'Agregar transacción'}
+            {editing ? 'Guardar cambios' : 'Agregar'}
           </button>
-          {editing && (
-            <button type="button" className={btn.secondary} onClick={onCancelEdit}>
-              Cancelar
+          {!editing && (
+            <button type="submit" className={btn.secondary} onClick={() => (keepOpen.current = true)}>
+              Agregar y otra
             </button>
           )}
+          <button type="button" className={btn.secondary} onClick={onCancel}>
+            Cancelar
+          </button>
         </div>
       </form>
-    </Card>
   );
 }

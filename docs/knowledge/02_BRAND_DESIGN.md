@@ -7,4 +7,5 @@
 - `RADIUS`: tarjetas `rounded-2xl`, inputs/botones `rounded-lg`
 - `FONT`: Inter → system-ui
 - `FAVICON`: `public/favicon.svg` (cuadro teal, "ISR")
+- `LAYOUT`: pestañas por ejercicio fiscal (año de la fecha) en el header; botón "Nueva transacción" abre un `<dialog>` modal fuera de las pestañas; cada pestaña: lista + resumen F11 + "Marco legal" (tabla del año y notas ley/cambio/aviso con fuente).
 - `R-UI-01`: Montos con `tabular-nums` y formato `es-SV` USD

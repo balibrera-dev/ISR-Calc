@@ -28,7 +28,8 @@
 - `FrequencyType`: CATORCENAL | QUINCENAL | MENSUAL | UNICO (aguinaldo, bonos únicos)
 - `TaxSummary`: ver `src/types.ts`
 
-## Reglas fiscales (`src/lib/tax.ts`)
+## Reglas fiscales (`src/lib/rules.ts` por año + `src/lib/tax.ts` cálculo)
+- `R-RULES-01`: Todo lo que cambia por ejercicio (tabla Art. 37, topes, decretos, notas legales con fuente) va en `rulesForYear()` / `YEAR_OVERRIDES` de `src/lib/rules.ts`. Año nuevo o reforma = nuevo bloque ahí.
 - `TAX_TABLE_2025+`: reforma abril 2025 (vigente 8-may-2025): Tramo I exento hasta **$6,600**; Tramo II 10% sobre exceso de $6,600 + $212.12 hasta $9,142.86; III y IV iguales. Se aplica a ejercicios ≥ 2025.
 - `TAX_TABLE_2011` (ejercicios ≤ 2024): Art. 37 LIR anual
   | Tramo | Desde | Hasta | % | Sobre exceso de | Cuota fija |

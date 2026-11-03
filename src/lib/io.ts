@@ -56,9 +56,9 @@ function toRows(list: Transaction[]) {
     }));
 }
 
-function summaryRows(s: TaxSummary, year: number | 'all') {
+function summaryRows(s: TaxSummary, year: number) {
   return [
-    ['Ejercicio fiscal', year === 'all' ? 'Todos' : year],
+    ['Ejercicio fiscal', year],
     ['Salarios brutos', s.totalGrossSalary],
     ['(-) ISSS', s.totalISSS],
     ['(-) AFP', s.totalAFP],
@@ -87,26 +87,34 @@ function legendRows() {
   ];
 }
 
-export function exportXlsx(list: Transaction[], summary: TaxSummary, year: number | 'all') {
+/**
+ * Exporta un libro con todas las transacciones (hoja "Transacciones", reimportable)
+ * y una hoja de resumen por cada ejercicio fiscal.
+ */
+export function exportXlsx(list: Transaction[], summaries: [number, TaxSummary][]) {
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.json_to_sheet(toRows(list), { header: COLUMNS.map((c) => c.header) });
   ws['!cols'] = [12, 32, 20, 14, 13, 10, 10, 10, 10, 15, 36, 38, 26].map((wch) => ({ wch }));
   XLSX.utils.book_append_sheet(wb, ws, 'Transacciones');
-  const sum = XLSX.utils.aoa_to_sheet(summaryRows(summary, year));
-  sum['!cols'] = [{ wch: 42 }, { wch: 16 }];
-  XLSX.utils.book_append_sheet(wb, sum, 'Resumen');
+  for (const [year, summary] of [...summaries].sort((a, b) => b[0] - a[0])) {
+    const sum = XLSX.utils.aoa_to_sheet(summaryRows(summary, year));
+    sum['!cols'] = [{ wch: 42 }, { wch: 16 }];
+    XLSX.utils.book_append_sheet(wb, sum, `Resumen ${year}`);
+  }
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(legendRows()), 'Códigos');
-  XLSX.writeFile(wb, `isr-calc-${year === 'all' ? 'todos' : year}.xlsx`);
+  XLSX.writeFile(wb, `isr-calc-${fileStamp()}.xlsx`);
 }
 
-export function exportCsv(list: Transaction[], year: number | 'all') {
+const fileStamp = () => new Date().toISOString().slice(0, 10);
+
+export function exportCsv(list: Transaction[]) {
   const ws = XLSX.utils.json_to_sheet(toRows(list), { header: COLUMNS.map((c) => c.header) });
   const csv = XLSX.utils.sheet_to_csv(ws);
   const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `isr-calc-${year === 'all' ? 'todos' : year}.csv`;
+  a.download = `isr-calc-${fileStamp()}.csv`;
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
