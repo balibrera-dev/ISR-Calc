@@ -7,6 +7,8 @@ export interface YearAlert {
   level: 'ok' | 'warn' | 'info';
   title: string;
   detail: string;
+  /** Detalle opcional (p. ej. boletas afectadas). */
+  items?: string[];
 }
 
 /** Art. 28 Ley de IVA: ¢50,000 en ventas de 12 meses o ¢20,000 en activos (a ¢8.75 por dólar). */
