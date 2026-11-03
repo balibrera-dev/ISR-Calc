@@ -74,6 +74,20 @@ export function parseDate(v: unknown, order: DateOrder = 'DMY'): string | null {
   return null;
 }
 
+export function parseBool(v: unknown): boolean | undefined {
+  if (typeof v === 'boolean') return v;
+  if (typeof v === 'number') return v !== 0;
+  if (typeof v !== 'string' || !v.trim()) return undefined;
+  const s = strip(v);
+  if (['si', 's', 'yes', 'y', 'true', '1', 'x'].includes(s)) return true;
+  if (['no', 'n', 'false', '0'].includes(s)) return false;
+  return undefined;
+}
+
+/** Sin columna "Aguinaldo": un pago único cuyo concepto o comentario dice "aguinaldo" se marca como tal. */
+const looksLikeAguinaldo = (t: Transaction) =>
+  t.frequency === 'UNICO' && /aguinaldo/.test(strip(`${t.concept} ${t.comment ?? ''}`));
+
 export type Result<T> = { ok: true; value: T } | { ok: false; error: string };
 
 /** Valida y normaliza un objeto plano a Transaction. */
@@ -104,6 +118,7 @@ export function normalizeTransaction(
     t.frequency = parseFrequency(raw.frequency) ?? 'MENSUAL';
     t.isssAmount = round2(Math.max(0, parseNumber(raw.isssAmount) ?? 0));
     t.afpAmount = round2(Math.max(0, parseNumber(raw.afpAmount) ?? 0));
+    if (parseBool(raw.isAguinaldo) ?? looksLikeAguinaldo(t)) t.isAguinaldo = true;
     const vialidad = parseNumber(raw.vialidadAmount);
     if (vialidad) t.vialidadAmount = round2(Math.max(0, vialidad));
   }

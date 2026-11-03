@@ -23,6 +23,7 @@ interface FormState {
   vialidadAmount: string;
   taxWithheld: string;
   comment: string;
+  isAguinaldo: boolean;
   autoSS: boolean;
 }
 
@@ -37,6 +38,7 @@ const emptyState = (prev?: FormState): FormState => ({
   vialidadAmount: '',
   taxWithheld: '',
   comment: '',
+  isAguinaldo: false,
   autoSS: true,
 });
 
@@ -51,6 +53,7 @@ const fromTx = (t: Transaction): FormState => ({
   vialidadAmount: t.vialidadAmount ? String(t.vialidadAmount) : '',
   taxWithheld: String(t.taxWithheld),
   comment: t.comment ?? '',
+  isAguinaldo: !!t.isAguinaldo,
   autoSS: false,
 });
 
@@ -110,6 +113,7 @@ export default function TransactionForm({ editing, onSave, onCancelEdit }: Props
       tx.frequency = f.frequency;
       tx.isssAmount = round2(num(f.isssAmount));
       tx.afpAmount = round2(num(f.afpAmount));
+      if (f.isAguinaldo) tx.isAguinaldo = true;
       if (num(f.vialidadAmount) > 0) tx.vialidadAmount = round2(num(f.vialidadAmount));
     }
     onSave(tx);
@@ -249,6 +253,15 @@ export default function TransactionForm({ editing, onSave, onCancelEdit }: Props
                 placeholder="0.00"
               />
             </Field>
+            <label className="flex items-center gap-2 text-sm sm:col-span-2">
+              <input
+                type="checkbox"
+                className="size-4 accent-teal-700"
+                checked={f.isAguinaldo}
+                onChange={(e) => set('isAguinaldo', e.target.checked)}
+              />
+              Es aguinaldo <span className="text-xs text-slate-500">(exento de renta hasta $1,500 por año)</span>
+            </label>
             <div className="flex items-end sm:col-span-2">
               <button type="button" className={`${btn.secondary} w-full`} onClick={applySuggestion}>
                 <Wand2 className="size-4" /> Recalcular ISSS / AFP

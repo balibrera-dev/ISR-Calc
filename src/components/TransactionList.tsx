@@ -94,6 +94,7 @@ export default function TransactionList({ transactions, editingId, onEdit, onDel
                   <p className="truncate text-xs text-slate-500">
                     {formatDate(t.date)} · {TRANSACTION_TYPE_LABELS[t.type]}
                     {t.frequency && ` · ${FREQUENCY_LABELS[t.frequency]}`}
+                    {t.isAguinaldo && ' · Aguinaldo'}
                   </p>
                   {t.comment && (
                     <p className="truncate text-xs text-slate-600 italic dark:text-slate-400" title={t.comment}>

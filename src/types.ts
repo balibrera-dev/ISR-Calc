@@ -17,7 +17,8 @@ export interface Transaction {
   frequency?: FrequencyType;
   isssAmount?: number;
   afpAmount?: number;
-  vialidadAmount?: number; // Contribución de vialidad retenida en planilla (no deducible de renta)
+  vialidadAmount?: number;
+  isAguinaldo?: boolean; // Aguinaldo: exento de renta hasta AGUINALDO_EXEMPT_CAP por año // Contribución de vialidad retenida en planilla (no deducible de renta)
 
   taxWithheld: number;
   comment?: string; // Nota libre del usuario
@@ -29,6 +30,8 @@ export interface TaxSummary {
   totalISSS: number;
   totalAFP: number;
   totalVialidad: number; // Informativo: no afecta la renta imponible
+  exemptAguinaldo: number; // Parte del aguinaldo exenta (máx. $1,500 por año)
+  fixedSalaryDeduction: number; // $1,600 si solo hay salarios y son ≤ $9,100
   netSalarySubjectToTax: number;
 
   totalIndependentFees: number;

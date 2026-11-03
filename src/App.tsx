@@ -46,7 +46,7 @@ export default function App() {
     () => (year === 'all' ? transactions : transactions.filter((t) => txYear(t) === year)),
     [transactions, year],
   );
-  const summary = useMemo(() => computeSummary(visible), [visible]);
+  const summary = useMemo(() => computeSummary(visible, year === 'all' ? undefined : year), [visible, year]);
 
   const save = (t: Transaction) => {
     setTransactions((list) => {

@@ -29,7 +29,8 @@
 - `TaxSummary`: ver `src/types.ts`
 
 ## Reglas fiscales (`src/lib/tax.ts`)
-- `TAX_TABLE`: Art. 37 LIR anual
+- `TAX_TABLE_2025+`: reforma abril 2025 (vigente 8-may-2025): Tramo I exento hasta **$6,600**; Tramo II 10% sobre exceso de $6,600 + $212.12 hasta $9,142.86; III y IV iguales. Se aplica a ejercicios ≥ 2025.
+- `TAX_TABLE_2011` (ejercicios ≤ 2024): Art. 37 LIR anual
   | Tramo | Desde | Hasta | % | Sobre exceso de | Cuota fija |
   |---|---|---|---|---|---|
   | I | 0.01 | 4,064.00 | 0 | – | 0 |
@@ -40,5 +41,8 @@
 - `R-TAX-02`: Renta imponible = salario neto + honorarios − médicos (máx $800) − educativos (máx $800), mínimo 0
 - `R-TAX-03`: Saldo = impuesto − total retenido (>0 pagar, <0 devolución)
 - `R-TAX-04`: ISSS sugerido 3% con tope salario $1,000/mes ($30/mes); AFP sugerido 7.25% sin tope. Ambos editables.
+- `R-TAX-07`: Aguinaldo (`isAguinaldo`) exento hasta $1,500 por año (decretos transitorios confirmados 2024–2026). Import marca automáticamente filas `UNICO` cuyo concepto/comentario dice "aguinaldo", o usa la columna `Aguinaldo` (Sí/No).
+- `R-TAX-08`: Deducción fija $1,600 solo si los ingresos son exclusivamente salarios y ≤ $9,100 (Art. 29 num. 7); reemplaza médicos/educativos.
+- `R-TAX-09` (explicación): tablas de retención asumen la deducción de $1,600 → en tramo III el F11 queda ~$320 (20% × $1,600) arriba de lo retenido para asalariados > $9,100.
 - `R-TAX-06`: Vialidad se registra y totaliza (`totalVialidad`) pero NO reduce la renta imponible
 - `R-TAX-05`: Resumen por ejercicio fiscal (año de `date`), selector "Todos los años" disponible.

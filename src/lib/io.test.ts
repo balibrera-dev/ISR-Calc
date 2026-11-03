@@ -93,3 +93,15 @@ describe('detectDateOrder', () => {
     expect(detectDateOrder(['1/2/2026', '3/15/2026'])).toBe('MDY');
   });
 });
+
+describe('aguinaldo import', () => {
+  it('marks UNICO rows mentioning aguinaldo, or with an Aguinaldo column', () => {
+    const { transactions } = rowsToTransactions([
+      { Fecha: '2025-12-10', Tipo: 'Salario', 'Monto Bruto': 1236.26, Frecuencia: 'UNICO', Comentario: 'Pago de Aguinaldo' },
+      { Fecha: '2022-12-23', Tipo: 'Salario', 'Monto Bruto': 551.1, Frecuencia: 'CATORCENAL', Comentario: 'Ajuste de Aguinaldo' },
+      { Fecha: '2025-12-11', Tipo: 'Salario', 'Monto Bruto': 100, Frecuencia: 'MENSUAL', Aguinaldo: 'Sí' },
+      { Fecha: '2025-12-12', Tipo: 'Salario', 'Monto Bruto': 100, Frecuencia: 'UNICO', Comentario: 'aguinaldo', Aguinaldo: 'No' },
+    ]);
+    expect(transactions.map((t) => !!t.isAguinaldo)).toEqual([true, false, true, false]);
+  });
+});

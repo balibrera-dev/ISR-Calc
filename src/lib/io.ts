@@ -13,6 +13,7 @@ export const COLUMNS: { header: string; key: keyof Transaction }[] = [
   { header: 'ISSS', key: 'isssAmount' },
   { header: 'AFP', key: 'afpAmount' },
   { header: 'Vialidad', key: 'vialidadAmount' },
+  { header: 'Aguinaldo', key: 'isAguinaldo' },
   { header: 'Renta Retenida', key: 'taxWithheld' },
   { header: 'Comentario', key: 'comment' },
   { header: 'ID', key: 'id' },
@@ -47,6 +48,7 @@ function toRows(list: Transaction[]) {
       ISSS: t.isssAmount ?? '',
       AFP: t.afpAmount ?? '',
       Vialidad: t.vialidadAmount ?? '',
+      Aguinaldo: t.isAguinaldo ? 'Sí' : '',
       'Renta Retenida': t.taxWithheld,
       Comentario: t.comment ?? '',
       ID: t.id,
@@ -61,8 +63,10 @@ function summaryRows(s: TaxSummary, year: number | 'all') {
     ['(-) ISSS', s.totalISSS],
     ['(-) AFP', s.totalAFP],
     ['Vialidad (informativo, no deducible)', s.totalVialidad],
+    ['(-) Aguinaldo exento (máx. $1,500/año)', s.exemptAguinaldo],
     ['Salario neto gravado', s.netSalarySubjectToTax],
     ['Honorarios brutos', s.totalIndependentFees],
+    ['(-) Deducción fija asalariados (≤ $9,100)', s.fixedSalaryDeduction],
     ['Gastos médicos (facturados)', s.grossDeductibleMedical],
     ['Gastos médicos (aplicados, máx. $800)', s.appliedDeductibleMedical],
     ['Gastos educativos (facturados)', s.grossDeductibleEdu],
@@ -86,7 +90,7 @@ function legendRows() {
 export function exportXlsx(list: Transaction[], summary: TaxSummary, year: number | 'all') {
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.json_to_sheet(toRows(list), { header: COLUMNS.map((c) => c.header) });
-  ws['!cols'] = [12, 32, 20, 14, 13, 10, 10, 10, 15, 36, 38, 26].map((wch) => ({ wch }));
+  ws['!cols'] = [12, 32, 20, 14, 13, 10, 10, 10, 10, 15, 36, 38, 26].map((wch) => ({ wch }));
   XLSX.utils.book_append_sheet(wb, ws, 'Transacciones');
   const sum = XLSX.utils.aoa_to_sheet(summaryRows(summary, year));
   sum['!cols'] = [{ wch: 42 }, { wch: 16 }];

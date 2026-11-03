@@ -1,6 +1,13 @@
 import { Info } from 'lucide-react';
 import type { TaxSummary } from '../types';
-import { ANNUAL_TAX_BRACKETS, DEDUCTION_CAP_EDU, DEDUCTION_CAP_MEDICAL, findBracket } from '../lib/tax';
+import {
+  AGUINALDO_EXEMPT_CAP,
+  DEDUCTION_CAP_EDU,
+  DEDUCTION_CAP_MEDICAL,
+  REFORM_2025_YEAR,
+  bracketsForYear,
+  findBracket,
+} from '../lib/tax';
 import { money } from '../lib/format';
 import { Card } from './ui';
 
@@ -20,7 +27,9 @@ function Row({ label, value, sub, strong, negative }: { label: string; value: nu
 }
 
 export default function SummaryPanel({ summary: s, year }: { summary: TaxSummary; year: number | 'all' }) {
-  const bracket = findBracket(s.taxableIncome);
+  const taxYear = year === 'all' ? undefined : year;
+  const brackets = bracketsForYear(taxYear);
+  const bracket = findBracket(s.taxableIncome, taxYear);
   const due = s.finalBalance > 0;
   const zero = s.finalBalance === 0;
 
@@ -63,6 +72,14 @@ export default function SummaryPanel({ summary: s, year }: { summary: TaxSummary
         <Row label="Salarios brutos" value={s.totalGrossSalary} />
         <Row label="ISSS" value={s.totalISSS} negative />
         <Row label="AFP" value={s.totalAFP} negative />
+        {s.exemptAguinaldo > 0 && (
+          <Row
+            label="Aguinaldo exento"
+            sub={`Máx. ${money(AGUINALDO_EXEMPT_CAP)} por año`}
+            value={s.exemptAguinaldo}
+            negative
+          />
+        )}
         <Row label="Salario neto gravado" value={s.netSalarySubjectToTax} strong />
         {s.totalVialidad > 0 && (
           <p className="flex justify-between py-1 text-xs text-slate-500">
@@ -85,6 +102,14 @@ export default function SummaryPanel({ summary: s, year }: { summary: TaxSummary
           value={s.appliedDeductibleEdu}
           negative
         />
+        {s.fixedSalaryDeduction > 0 && (
+          <Row
+            label="Deducción fija asalariados"
+            sub="Solo salarios ≤ $9,100 (reemplaza médicos/educativos)"
+            value={s.fixedSalaryDeduction}
+            negative
+          />
+        )}
         <hr className="my-2 border-slate-200 dark:border-slate-800" />
         <Row label="Renta neta imponible" value={s.taxableIncome} strong />
         <Row label={`Impuesto (tramo ${bracket.tramo})`} value={s.calculatedTax} strong />
@@ -94,6 +119,11 @@ export default function SummaryPanel({ summary: s, year }: { summary: TaxSummary
 
       <Card className="text-sm">
         <h2 className="mb-2 text-base font-semibold">Tabla anual · Art. 37 LIR</h2>
+        <p className="mb-2 text-xs text-slate-500">
+          {taxYear !== undefined && taxYear < REFORM_2025_YEAR
+            ? 'Tabla vigente hasta 2024 (exento hasta $4,064).'
+            : 'Reforma 2025: exento hasta $6,600 anuales ($550/mes).'}
+        </p>
         <table className="w-full text-xs">
           <thead className="text-slate-500">
             <tr className="text-left">
@@ -105,7 +135,7 @@ export default function SummaryPanel({ summary: s, year }: { summary: TaxSummary
             </tr>
           </thead>
           <tbody className="tabular-nums">
-            {ANNUAL_TAX_BRACKETS.map((b) => (
+            {brackets.map((b) => (
               <tr
                 key={b.tramo}
                 className={b.tramo === bracket.tramo ? 'font-semibold text-teal-700 dark:text-teal-400' : ''}
