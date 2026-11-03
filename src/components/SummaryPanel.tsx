@@ -1,6 +1,6 @@
 import type { TaxSummary } from '../types';
 import { aguinaldoRuleFor, type YearRules } from '../lib/rules';
-import { findBracket, round2 } from '../lib/tax';
+import { bracketIn, round2 } from '../lib/tax';
 import { money } from '../lib/format';
 import { Card } from './ui';
 
@@ -22,7 +22,7 @@ function Row({ label, value, sub, strong, negative }: { label: string; value: nu
 export default function SummaryPanel({ summary: s, rules }: { summary: TaxSummary; rules: YearRules }) {
   const agRule = aguinaldoRuleFor(rules.year);
   const year = rules.year;
-  const bracket = findBracket(s.taxableIncome, year);
+  const bracket = bracketIn(s.taxableIncome, rules.brackets);
   const due = s.finalBalance > 0;
   const zero = s.finalBalance === 0;
 

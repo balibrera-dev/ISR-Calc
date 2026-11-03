@@ -1,6 +1,6 @@
 import { AlertTriangle, BookOpen, ExternalLink, Sparkles } from 'lucide-react';
 import type { LegalNote, YearRules } from '../lib/rules';
-import { findBracket } from '../lib/tax';
+import { bracketIn, taxForOption } from '../lib/tax';
 import { money } from '../lib/format';
 import { Card } from './ui';
 
@@ -18,12 +18,52 @@ const KIND: Record<LegalNote['kind'], { icon: typeof BookOpen; label: string; cl
   ley: { icon: BookOpen, label: 'Ley', cls: 'text-slate-600 bg-slate-100 dark:text-slate-300 dark:bg-slate-800' },
 };
 
-export default function LegalPanel({ rules, taxableIncome }: { rules: YearRules; taxableIncome: number }) {
-  const current = findBracket(taxableIncome, rules.year);
+export default function LegalPanel({
+  rules,
+  taxableIncome,
+  onTableChange,
+}: {
+  rules: YearRules;
+  taxableIncome: number;
+  onTableChange: (id: string) => void;
+}) {
+  const current = bracketIn(taxableIncome, rules.brackets);
   return (
     <Card className="text-sm">
       <h2 className="text-base font-semibold">Marco legal · ejercicio {rules.year}</h2>
       <p className="mt-1 text-xs text-slate-500">{rules.bracketsLabel}</p>
+
+      {rules.tableOptions.length > 1 && (
+        <fieldset className="mt-3 rounded-xl border border-amber-200 bg-amber-50/60 p-3 dark:border-amber-900 dark:bg-amber-950/30">
+          <legend className="px-1 text-xs font-medium text-amber-900 dark:text-amber-200">
+            La tabla cambió a mitad de {rules.year}: ¿cómo calcular el F11?
+          </legend>
+          <div className="grid gap-2 sm:grid-cols-3">
+            {rules.tableOptions.map((o) => {
+              const on = o.id === rules.tableId;
+              return (
+                <label
+                  key={o.id}
+                  className={`cursor-pointer rounded-lg border px-3 py-2 text-xs ${on ? 'border-teal-600 bg-white ring-2 ring-teal-600/20 dark:bg-slate-900' : 'border-slate-200 bg-white/60 dark:border-slate-700 dark:bg-slate-900/60'}`}
+                >
+                  <input
+                    type="radio"
+                    name={`tabla-${rules.year}`}
+                    className="sr-only"
+                    checked={on}
+                    onChange={() => onTableChange(o.id)}
+                  />
+                  <span className="block font-medium">{o.label}</span>
+                  <span className="block text-slate-500">{o.detail}</span>
+                  <span className="mt-1 block font-semibold tabular-nums">
+                    Impuesto: {money(taxForOption(taxableIncome, o))}
+                  </span>
+                </label>
+              );
+            })}
+          </div>
+        </fieldset>
+      )}
 
       <div className="mt-3 overflow-x-auto">
         <table className="w-full min-w-[420px] text-xs">

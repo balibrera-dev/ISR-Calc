@@ -3,7 +3,14 @@ import type { FrequencyType, Transaction, TaxSummary } from '../types';
 /** Redondeo a centavos evitando errores de coma flotante. */
 export const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
 
-import { ANNUAL_TAX_BRACKETS, ANNUAL_TAX_BRACKETS_2011, REFORM_2025_YEAR, rulesForYear, type TaxBracket } from './rules';
+import {
+  ANNUAL_TAX_BRACKETS,
+  ANNUAL_TAX_BRACKETS_2011,
+  REFORM_2025_YEAR,
+  rulesForYear,
+  type TableOption,
+  type TaxBracket,
+} from './rules';
 
 export { ANNUAL_TAX_BRACKETS, ANNUAL_TAX_BRACKETS_2011, REFORM_2025_YEAR, rulesForYear, type TaxBracket };
 
@@ -24,22 +31,36 @@ export const PERIODS_PER_YEAR: Record<FrequencyType, number> = {
 };
 
 /** Tabla del Art. 37 aplicable a un ejercicio fiscal (sin año: la vigente). */
-export function bracketsForYear(year?: number): TaxBracket[] {
-  return rulesForYear(year ?? new Date().getFullYear()).brackets;
+export function bracketsForYear(year?: number, tableId?: string): TaxBracket[] {
+  return rulesForYear(year ?? new Date().getFullYear(), tableId).brackets;
 }
 
-export function findBracket(taxableIncome: number, year?: number): TaxBracket {
+export function bracketIn(taxableIncome: number, table: TaxBracket[]): TaxBracket {
   const income = round2(taxableIncome);
-  const table = bracketsForYear(year);
   return table.find((b) => b.hasta === null || income <= b.hasta) ?? table[table.length - 1];
 }
 
-/** Impuesto determinado anual según Art. 37 LIR. */
-export function computeAnnualTax(taxableIncome: number, year?: number): number {
+export function findBracket(taxableIncome: number, year?: number, tableId?: string): TaxBracket {
+  return bracketIn(taxableIncome, bracketsForYear(year, tableId));
+}
+
+/** Impuesto del Art. 37 con una tabla concreta. */
+export function taxFromBrackets(taxableIncome: number, table: TaxBracket[]): number {
   if (!(taxableIncome > 0)) return 0;
-  const b = findBracket(taxableIncome, year);
+  const b = bracketIn(taxableIncome, table);
   if (b.tasa === 0) return 0;
   return round2((round2(taxableIncome) - b.exceso) * b.tasa + b.cuotaFija);
+}
+
+/** Impuesto de una opción de tabla (suma ponderada si el año tuvo cambio de tabla). */
+export function taxForOption(taxableIncome: number, option: TableOption): number {
+  return round2(option.parts.reduce((a, p) => a + taxFromBrackets(taxableIncome, p.brackets) * p.weight, 0));
+}
+
+/** Impuesto determinado anual según Art. 37 LIR. */
+export function computeAnnualTax(taxableIncome: number, year?: number, tableId?: string): number {
+  const rules = rulesForYear(year ?? new Date().getFullYear(), tableId);
+  return taxForOption(taxableIncome, rules.tableOptions.find((o) => o.id === rules.tableId)!);
 }
 
 /** Cotizaciones sugeridas para un pago de salario, según su frecuencia. */
@@ -68,8 +89,8 @@ export function indemnizacionCap(t: Pick<Transaction, 'serviceYears' | 'baseSala
 /**
  * @param year ejercicio fiscal; define qué tabla del Art. 37 se usa. Sin año (vista "todos los años") usa la vigente.
  */
-export function computeSummary(transactions: Transaction[], year?: number): TaxSummary {
-  const rules = rulesForYear(year ?? new Date().getFullYear());
+export function computeSummary(transactions: Transaction[], year?: number, tableId?: string): TaxSummary {
+  const rules = rulesForYear(year ?? new Date().getFullYear(), tableId);
   const aguinaldoByYear = new Map<number, number>();
   let totalGrossSalary = 0;
   let totalISSS = 0;
@@ -158,7 +179,7 @@ export function computeSummary(transactions: Transaction[], year?: number): TaxS
       appliedDeductibleMedical -
       appliedDeductibleEdu,
   );
-  const calculatedTax = computeAnnualTax(taxableIncome, year);
+  const calculatedTax = computeAnnualTax(taxableIncome, year, rules.tableId);
 
   return {
     totalGrossSalary: round2(totalGrossSalary),

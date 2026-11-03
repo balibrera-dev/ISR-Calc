@@ -20,10 +20,25 @@ export interface LegalNote {
   source?: { label: string; url: string };
 }
 
+/**
+ * Forma de aplicar el Art. 37 en el F11 de un año. Normalmente hay una sola; cuando la tabla cambia a
+ * mitad de año hay varias (tabla nueva todo el año, proporcional por meses, tabla anterior) y el usuario
+ * elige. El impuesto es la suma de cada tabla por su peso (fracción del año).
+ */
+export interface TableOption {
+  id: string;
+  label: string;
+  detail: string;
+  parts: { brackets: TaxBracket[]; weight: number }[];
+}
+
 export interface YearRules {
   year: number;
+  /** Tabla que se muestra (la principal de la opción elegida). */
   brackets: TaxBracket[];
   bracketsLabel: string;
+  tableOptions: TableOption[];
+  tableId: string;
   medicalCap: number;
   eduCap: number;
   aguinaldoCap: number;
@@ -227,15 +242,63 @@ const YEAR_OVERRIDES: Record<number, { notes: LegalNote[] }> = {
       },
       {
         kind: 'aviso',
-        title: 'Tabla aplicada al año completo',
+        title: 'Cambio de tabla a mitad de año',
         detail:
-          'La app usa la tabla reformada para todo el ejercicio 2025. Confirma con Hacienda o un contador cómo se trata enero–abril.',
+          'La reforma entró en vigencia el 8 de mayo. Arriba puedes elegir cómo calcular el F11: tabla nueva todo el año (la que usa la app por defecto), proporcional por meses o la tabla anterior. Confirma con Hacienda o un contador cuál aplica.',
       },
     ],
   },
 };
 
-export function rulesForYear(year: number): YearRules {
+/**
+ * Cambios de tabla del Art. 37 a mitad de un ejercicio. Para un cambio futuro basta con agregar una
+ * entrada: el año tendrá las tres opciones de cálculo.
+ */
+const MID_YEAR_TABLE_CHANGES: {
+  year: number;
+  /** Meses del año con la tabla anterior (ene–abr = 4). */
+  monthsBefore: number;
+  before: { label: string; brackets: TaxBracket[] };
+  after: { label: string; brackets: TaxBracket[] };
+}[] = [
+  {
+    year: 2025,
+    monthsBefore: 4,
+    before: { label: 'tabla 2011', brackets: ANNUAL_TAX_BRACKETS_2011 },
+    after: { label: 'tabla reformada', brackets: ANNUAL_TAX_BRACKETS },
+  },
+];
+
+function tableOptionsFor(year: number, brackets: TaxBracket[], label: string): TableOption[] {
+  const change = MID_YEAR_TABLE_CHANGES.find((c) => c.year === year);
+  if (!change) return [{ id: 'unica', label, detail: label, parts: [{ brackets, weight: 1 }] }];
+  const after = (12 - change.monthsBefore) / 12;
+  return [
+    {
+      id: 'nueva',
+      label: `${change.after.label[0].toUpperCase()}${change.after.label.slice(1)} todo el año`,
+      detail: `Todo ${year} con la ${change.after.label}.`,
+      parts: [{ brackets: change.after.brackets, weight: 1 }],
+    },
+    {
+      id: 'proporcional',
+      label: 'Proporcional por meses',
+      detail: `${change.monthsBefore} meses con la ${change.before.label} y ${12 - change.monthsBefore} con la ${change.after.label}.`,
+      parts: [
+        { brackets: change.after.brackets, weight: after },
+        { brackets: change.before.brackets, weight: 1 - after },
+      ],
+    },
+    {
+      id: 'anterior',
+      label: `${change.before.label[0].toUpperCase()}${change.before.label.slice(1)} todo el año`,
+      detail: `Todo ${year} con la ${change.before.label}.`,
+      parts: [{ brackets: change.before.brackets, weight: 1 }],
+    },
+  ];
+}
+
+export function rulesForYear(year: number, tableId?: string): YearRules {
   const reformed = year >= REFORM_2025_YEAR;
   const override = YEAR_OVERRIDES[year];
   const notes = [...(override?.notes ?? []), aguinaldoNote(year)];
@@ -245,10 +308,16 @@ export function rulesForYear(year: number): YearRules {
       title: 'Tabla del Art. 37 de 2011',
       detail: 'Para este ejercicio aplica la tabla anterior a la reforma de 2025: exento hasta $4,064.',
     });
+  const baseLabel = reformed ? 'Reforma 2025: exento hasta $6,600 anuales' : 'Tabla 2011: exento hasta $4,064 anuales';
+  const tableOptions = tableOptionsFor(year, reformed ? ANNUAL_TAX_BRACKETS : ANNUAL_TAX_BRACKETS_2011, baseLabel);
+  const option = tableOptions.find((o) => o.id === tableId) ?? tableOptions[0];
+  const main = option.parts.reduce((a, b) => (b.weight > a.weight ? b : a));
   return {
     year,
-    brackets: reformed ? ANNUAL_TAX_BRACKETS : ANNUAL_TAX_BRACKETS_2011,
-    bracketsLabel: reformed ? 'Reforma 2025: exento hasta $6,600 anuales' : 'Tabla 2011: exento hasta $4,064 anuales',
+    brackets: main.brackets,
+    bracketsLabel: tableOptions.length > 1 ? option.detail : baseLabel,
+    tableOptions,
+    tableId: option.id,
     medicalCap: 800,
     eduCap: 800,
     aguinaldoCap: aguinaldoRuleFor(year).cap,

@@ -4,7 +4,7 @@ import type { Transaction } from './types';
 import { computeSummary, txYear } from './lib/tax';
 import { rulesForYear } from './lib/rules';
 import { todayISO } from './lib/format';
-import { loadTransactions, saveTransactions, THEME_KEY } from './lib/storage';
+import { loadTableChoices, loadTransactions, saveTableChoices, saveTransactions, THEME_KEY } from './lib/storage';
 import TransactionForm from './components/TransactionForm';
 import TransactionList from './components/TransactionList';
 import SummaryPanel from './components/SummaryPanel';
@@ -26,6 +26,7 @@ export default function App() {
   const [transactions, setTransactions] = useState<Transaction[]>(loadTransactions);
   const [year, setYear] = useState<number>(CURRENT_YEAR);
   const [dialog, setDialog] = useState<DialogState>(null);
+  const [tables, setTables] = useState<Record<number, string>>(loadTableChoices);
   const [notice, setNotice] = useState<Notice | null>(null);
   const [dark, setDark] = useState(() => document.documentElement.classList.contains('dark'));
   const fileRef = useRef<HTMLInputElement>(null);
@@ -33,6 +34,10 @@ export default function App() {
   useEffect(() => {
     saveTransactions(transactions);
   }, [transactions]);
+
+  useEffect(() => {
+    saveTableChoices(tables);
+  }, [tables]);
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', dark);
@@ -69,8 +74,8 @@ export default function App() {
   }, [byYear, year]);
 
   const visible = byYear.get(year) ?? [];
-  const rules = useMemo(() => rulesForYear(year), [year]);
-  const summary = useMemo(() => computeSummary(visible, year), [visible, year]);
+  const rules = useMemo(() => rulesForYear(year, tables[year]), [year, tables]);
+  const summary = useMemo(() => computeSummary(visible, year, rules.tableId), [visible, year, rules]);
   const alerts = useMemo(() => yearAlerts(visible, summary, rules), [visible, summary, rules]);
   const slipAlerts = useMemo(() => payslipAlerts(visible, summary, rules), [visible, summary, rules]);
 
@@ -109,7 +114,7 @@ export default function App() {
     const io = await import('./lib/io');
     io.exportXlsx(
       transactions,
-      years.filter((y) => counts.get(y)).map((y) => [y, computeSummary(byYear.get(y)!, y)]),
+      years.filter((y) => counts.get(y)).map((y) => [y, computeSummary(byYear.get(y)!, y, tables[y])]),
     );
   };
 
@@ -229,7 +234,11 @@ export default function App() {
             onEdit={(t) => setDialog(t)}
             onDelete={remove}
           />
-          <LegalPanel rules={rules} taxableIncome={summary.taxableIncome} />
+          <LegalPanel
+            rules={rules}
+            taxableIncome={summary.taxableIncome}
+            onTableChange={(id) => setTables((t) => ({ ...t, [year]: id }))}
+          />
           {visible.length > 0 && (
             <button className={`${btn.ghost} gap-2 px-2 text-xs`} onClick={clearYear}>
               <Trash className="size-3.5" /> Borrar ejercicio {year}
