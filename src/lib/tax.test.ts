@@ -55,16 +55,33 @@ describe('computeAnnualTax (reforma 2025: exento hasta $6,600)', () => {
 });
 
 describe('aguinaldo', () => {
-  it('exempts up to $1,500 per year and taxes the excess', () => {
-    const s = computeSummary(
-      [
-        tx({ grossAmount: 14000 }),
-        tx({ grossAmount: 1200, frequency: 'UNICO', isAguinaldo: true }),
-        tx({ date: '2025-12-10', grossAmount: 1800, frequency: 'UNICO', isAguinaldo: true }),
-      ],
-    );
+  it('exempts up to the cap of each year and taxes the excess', () => {
+    const s = computeSummary([
+      tx({ grossAmount: 14000 }),
+      tx({ type: 'AGUINALDO', grossAmount: 1200, frequency: undefined }),
+      tx({ type: 'AGUINALDO', date: '2025-12-10', grossAmount: 1800, frequency: undefined }),
+    ]);
+    expect(s.totalAguinaldo).toBe(3000);
     expect(s.exemptAguinaldo).toBe(2700);
-    expect(s.netSalarySubjectToTax).toBe(14300);
+    expect(s.taxableAguinaldo).toBe(300);
+    expect(s.netSalarySubjectToTax).toBe(14000);
+    expect(s.taxableIncome).toBe(14300);
+  });
+
+  it('uses $1,100 in 2021 and the base law (2 minimum wages) in 2020', () => {
+    const ag = (date: string, amount: number) =>
+      computeSummary([tx({ type: 'AGUINALDO', date, grossAmount: amount, frequency: undefined })], Number(date.slice(0, 4)));
+    expect(ag('2021-12-15', 1300).taxableAguinaldo).toBe(200);
+    expect(ag('2020-12-15', 813.77).exemptAguinaldo).toBe(608.34);
+    expect(ag('2020-12-15', 813.77).taxableAguinaldo).toBeCloseTo(205.43, 2);
+  });
+
+  it('keeps the $1,600 fixed deduction when aguinaldo is fully exempt', () => {
+    const s = computeSummary(
+      [tx({ grossAmount: 7000, date: '2025-06-30' }), tx({ type: 'AGUINALDO', date: '2025-12-15', grossAmount: 600, frequency: undefined })],
+      2025,
+    );
+    expect(s.fixedSalaryDeduction).toBe(1600);
   });
 });
 

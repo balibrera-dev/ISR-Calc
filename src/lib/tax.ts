@@ -10,7 +10,6 @@ export { ANNUAL_TAX_BRACKETS, ANNUAL_TAX_BRACKETS_2011, REFORM_2025_YEAR, rulesF
 const CURRENT = rulesForYear(new Date().getFullYear());
 export const DEDUCTION_CAP_MEDICAL = CURRENT.medicalCap;
 export const DEDUCTION_CAP_EDU = CURRENT.eduCap;
-export const AGUINALDO_EXEMPT_CAP = CURRENT.aguinaldoCap;
 
 export const ISSS_RATE = 0.03;
 /** Salario máximo cotizable al ISSS: $1,000 mensuales (cotización máxima $30/mes). */
@@ -78,7 +77,9 @@ export function computeSummary(transactions: Transaction[], year?: number): TaxS
         totalISSS += Number(t.isssAmount) || 0;
         totalAFP += Number(t.afpAmount) || 0;
         totalVialidad += Number(t.vialidadAmount) || 0;
-        if (t.isAguinaldo) aguinaldoByYear.set(txYear(t), (aguinaldoByYear.get(txYear(t)) ?? 0) + amount);
+        break;
+      case 'AGUINALDO':
+        aguinaldoByYear.set(txYear(t), (aguinaldoByYear.get(txYear(t)) ?? 0) + amount);
         break;
       case 'INDEPENDENT_FEES':
         totalIndependentFees += amount;
@@ -93,20 +94,27 @@ export function computeSummary(transactions: Transaction[], year?: number): TaxS
     totalTaxWithheld += Number(t.taxWithheld) || 0;
   }
 
+  // Aguinaldo: exento hasta el tope de su año; solo el excedente es renta gravada.
+  let totalAguinaldo = 0;
   let exemptAguinaldo = 0;
-  aguinaldoByYear.forEach((v, y) => (exemptAguinaldo += Math.min(v, rulesForYear(y).aguinaldoCap)));
-  const netSalarySubjectToTax = Math.max(0, totalGrossSalary - totalISSS - totalAFP - exemptAguinaldo);
+  aguinaldoByYear.forEach((v, y) => {
+    totalAguinaldo += v;
+    exemptAguinaldo += Math.min(v, rulesForYear(y).aguinaldoCap);
+  });
+  const taxableAguinaldo = totalAguinaldo - exemptAguinaldo;
+  const netSalarySubjectToTax = Math.max(0, totalGrossSalary - totalISSS - totalAFP);
   // Art. 29 num. 7: solo salarios y ≤ $9,100 → deducción fija de $1,600 (en lugar de médicos/educativos).
   const qualifiesFixed =
     totalIndependentFees === 0 &&
-    totalGrossSalary > 0 &&
-    totalGrossSalary - exemptAguinaldo <= rules.fixedSalaryDeductionLimit;
+    totalGrossSalary + totalAguinaldo > 0 &&
+    totalGrossSalary + taxableAguinaldo <= rules.fixedSalaryDeductionLimit;
   const fixedSalaryDeduction = qualifiesFixed ? rules.fixedSalaryDeduction : 0;
   const appliedDeductibleMedical = qualifiesFixed ? 0 : Math.min(grossDeductibleMedical, rules.medicalCap);
   const appliedDeductibleEdu = qualifiesFixed ? 0 : Math.min(grossDeductibleEdu, rules.eduCap);
   const taxableIncome = Math.max(
     0,
     netSalarySubjectToTax +
+      taxableAguinaldo +
       totalIndependentFees -
       fixedSalaryDeduction -
       appliedDeductibleMedical -
@@ -119,7 +127,9 @@ export function computeSummary(transactions: Transaction[], year?: number): TaxS
     totalISSS: round2(totalISSS),
     totalAFP: round2(totalAFP),
     totalVialidad: round2(totalVialidad),
+    totalAguinaldo: round2(totalAguinaldo),
     exemptAguinaldo: round2(exemptAguinaldo),
+    taxableAguinaldo: round2(taxableAguinaldo),
     fixedSalaryDeduction,
     netSalarySubjectToTax: round2(netSalarySubjectToTax),
     totalIndependentFees: round2(totalIndependentFees),

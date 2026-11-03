@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { BriefcaseBusiness, GraduationCap, HeartPulse, Pencil, Search, Trash2, Wallet } from 'lucide-react';
+import { BriefcaseBusiness, Gift, GraduationCap, HeartPulse, Pencil, Search, Trash2, Wallet } from 'lucide-react';
 import type { Transaction, TransactionType } from '../types';
 import { FREQUENCY_LABELS, TRANSACTION_TYPE_LABELS } from '../types';
 import { formatDate, money } from '../lib/format';
@@ -8,6 +8,7 @@ import { Card, btn, inputBase } from './ui';
 const ICONS: Record<TransactionType, typeof Wallet> = {
   SALARY_FORMAL: Wallet,
   INDEPENDENT_FEES: BriefcaseBusiness,
+  AGUINALDO: Gift,
   DEDUCTIBLE_MEDICAL: HeartPulse,
   DEDUCTIBLE_EDU: GraduationCap,
 };
@@ -15,6 +16,7 @@ const ICONS: Record<TransactionType, typeof Wallet> = {
 const BADGE: Record<TransactionType, string> = {
   SALARY_FORMAL: 'bg-teal-100 text-teal-800 dark:bg-teal-900/50 dark:text-teal-300',
   INDEPENDENT_FEES: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/50 dark:text-indigo-300',
+  AGUINALDO: 'bg-fuchsia-100 text-fuchsia-800 dark:bg-fuchsia-900/50 dark:text-fuchsia-300',
   DEDUCTIBLE_MEDICAL: 'bg-rose-100 text-rose-800 dark:bg-rose-900/50 dark:text-rose-300',
   DEDUCTIBLE_EDU: 'bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300',
 };
@@ -94,7 +96,6 @@ export default function TransactionList({ transactions, editingId, onEdit, onDel
                   <p className="truncate text-xs text-slate-500">
                     {formatDate(t.date)} · {TRANSACTION_TYPE_LABELS[t.type]}
                     {t.frequency && ` · ${FREQUENCY_LABELS[t.frequency]}`}
-                    {t.isAguinaldo && ' · Aguinaldo'}
                   </p>
                   {t.comment && (
                     <p className="truncate text-xs text-slate-600 italic dark:text-slate-400" title={t.comment}>

@@ -79,7 +79,7 @@ describe('historical CSV with Vialidad, Comment, UNICO and MM/DD/YYYY dates', ()
   it('imports vialidad, comments and one-time payments', () => {
     expect(transactions[1].vialidadAmount).toBe(3.43);
     expect(transactions[0].vialidadAmount).toBeUndefined();
-    expect(transactions[2]).toMatchObject({ frequency: 'UNICO', comment: 'Pago de Aguinaldo', grossAmount: 1236.26 });
+    expect(transactions[2]).toMatchObject({ type: 'AGUINALDO', comment: 'Pago de Aguinaldo', grossAmount: 1236.26 });
   });
 
   it('skips blank rows and reports rows without an amount', () => {
@@ -95,13 +95,20 @@ describe('detectDateOrder', () => {
 });
 
 describe('aguinaldo import', () => {
-  it('marks UNICO rows mentioning aguinaldo, or with an Aguinaldo column', () => {
+  it('turns UNICO salary rows mentioning aguinaldo, or with an Aguinaldo column, into the Aguinaldo type', () => {
     const { transactions } = rowsToTransactions([
       { Fecha: '2025-12-10', Tipo: 'Salario', 'Monto Bruto': 1236.26, Frecuencia: 'UNICO', Comentario: 'Pago de Aguinaldo' },
       { Fecha: '2022-12-23', Tipo: 'Salario', 'Monto Bruto': 551.1, Frecuencia: 'CATORCENAL', Comentario: 'Ajuste de Aguinaldo' },
       { Fecha: '2025-12-11', Tipo: 'Salario', 'Monto Bruto': 100, Frecuencia: 'MENSUAL', Aguinaldo: 'Sí' },
       { Fecha: '2025-12-12', Tipo: 'Salario', 'Monto Bruto': 100, Frecuencia: 'UNICO', Comentario: 'aguinaldo', Aguinaldo: 'No' },
     ]);
-    expect(transactions.map((t) => !!t.isAguinaldo)).toEqual([true, false, true, false]);
+    expect(transactions.map((t) => t.type)).toEqual(['AGUINALDO', 'SALARY_FORMAL', 'AGUINALDO', 'SALARY_FORMAL']);
+  });
+});
+
+describe('aguinaldo type', () => {
+  it('accepts "Aguinaldo" as Tipo', () => {
+    const { transactions } = rowsToTransactions([{ Fecha: '2024-12-12', Tipo: 'Aguinaldo', 'Monto Bruto': 900 }]);
+    expect(transactions[0].type).toBe('AGUINALDO');
   });
 });

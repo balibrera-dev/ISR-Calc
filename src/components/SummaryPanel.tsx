@@ -1,5 +1,5 @@
 import type { TaxSummary } from '../types';
-import type { YearRules } from '../lib/rules';
+import { aguinaldoRuleFor, type YearRules } from '../lib/rules';
 import { findBracket, round2 } from '../lib/tax';
 import { money } from '../lib/format';
 import { Card } from './ui';
@@ -20,6 +20,7 @@ function Row({ label, value, sub, strong, negative }: { label: string; value: nu
 }
 
 export default function SummaryPanel({ summary: s, rules }: { summary: TaxSummary; rules: YearRules }) {
+  const agRule = aguinaldoRuleFor(rules.year);
   const year = rules.year;
   const bracket = findBracket(s.taxableIncome, year);
   const due = s.finalBalance > 0;
@@ -64,14 +65,6 @@ export default function SummaryPanel({ summary: s, rules }: { summary: TaxSummar
         <Row label="Salarios brutos" value={s.totalGrossSalary} />
         <Row label="ISSS" value={s.totalISSS} negative />
         <Row label="AFP" value={s.totalAFP} negative />
-        {s.exemptAguinaldo > 0 && (
-          <Row
-            label="Aguinaldo exento"
-            sub={`Máx. ${money(rules.aguinaldoCap)} por año`}
-            value={s.exemptAguinaldo}
-            negative
-          />
-        )}
         <Row label="Salario neto gravado" value={s.netSalarySubjectToTax} strong />
         {s.totalVialidad > 0 && (
           <p className="flex justify-between py-1 text-xs text-slate-500">
@@ -80,6 +73,19 @@ export default function SummaryPanel({ summary: s, rules }: { summary: TaxSummar
           </p>
         )}
         <hr className="my-2 border-slate-200 dark:border-slate-800" />
+        {s.totalAguinaldo > 0 && (
+          <>
+            <Row label="Aguinaldo recibido" value={s.totalAguinaldo} />
+            <Row
+              label="Aguinaldo exento"
+              sub={`Tope ${rules.year}: ${money(rules.aguinaldoCap)}${agRule.verified ? '' : ' (por confirmar)'}`}
+              value={s.exemptAguinaldo}
+              negative
+            />
+            <Row label="Aguinaldo gravado (excedente)" value={s.taxableAguinaldo} strong />
+            <hr className="my-2 border-slate-200 dark:border-slate-800" />
+          </>
+        )}
         <Row label="Honorarios brutos" value={s.totalIndependentFees} strong />
         <hr className="my-2 border-slate-200 dark:border-slate-800" />
         <Row
