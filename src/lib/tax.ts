@@ -3,28 +3,14 @@ import type { FrequencyType, Transaction, TaxSummary } from '../types';
 /** Redondeo a centavos evitando errores de coma flotante. */
 export const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
 
-/**
- * Tabla anual de retención / cálculo, Art. 37 Ley de Impuesto sobre la Renta (LIR).
- * Impuesto = (renta - exceso) * tasa + cuotaFija, para el tramo donde cae la renta.
- */
-export interface TaxBracket {
-  tramo: string;
-  desde: number;
-  hasta: number | null;
-  tasa: number;
-  exceso: number;
-  cuotaFija: number;
-}
+import { ANNUAL_TAX_BRACKETS, ANNUAL_TAX_BRACKETS_2011, REFORM_2025_YEAR, rulesForYear, type TaxBracket } from './rules';
 
-export const ANNUAL_TAX_BRACKETS: TaxBracket[] = [
-  { tramo: 'I', desde: 0.01, hasta: 4064.0, tasa: 0, exceso: 0, cuotaFija: 0 },
-  { tramo: 'II', desde: 4064.01, hasta: 9142.86, tasa: 0.1, exceso: 4064.0, cuotaFija: 212.12 },
-  { tramo: 'III', desde: 9142.87, hasta: 22857.14, tasa: 0.2, exceso: 9142.86, cuotaFija: 720.0 },
-  { tramo: 'IV', desde: 22857.15, hasta: null, tasa: 0.3, exceso: 22857.14, cuotaFija: 3462.86 },
-];
+export { ANNUAL_TAX_BRACKETS, ANNUAL_TAX_BRACKETS_2011, REFORM_2025_YEAR, rulesForYear, type TaxBracket };
 
-export const DEDUCTION_CAP_MEDICAL = 800;
-export const DEDUCTION_CAP_EDU = 800;
+const CURRENT = rulesForYear(new Date().getFullYear());
+export const DEDUCTION_CAP_MEDICAL = CURRENT.medicalCap;
+export const DEDUCTION_CAP_EDU = CURRENT.eduCap;
+export const AGUINALDO_EXEMPT_CAP = CURRENT.aguinaldoCap;
 
 export const ISSS_RATE = 0.03;
 /** Salario máximo cotizable al ISSS: $1,000 mensuales (cotización máxima $30/mes). */
@@ -35,20 +21,24 @@ export const PERIODS_PER_YEAR: Record<FrequencyType, number> = {
   MENSUAL: 12,
   QUINCENAL: 24,
   CATORCENAL: 26,
+  UNICO: 12, // pagos únicos (aguinaldo, bonos): se usa el tope mensual de ISSS
 };
 
-export function findBracket(taxableIncome: number): TaxBracket {
+/** Tabla del Art. 37 aplicable a un ejercicio fiscal (sin año: la vigente). */
+export function bracketsForYear(year?: number): TaxBracket[] {
+  return rulesForYear(year ?? new Date().getFullYear()).brackets;
+}
+
+export function findBracket(taxableIncome: number, year?: number): TaxBracket {
   const income = round2(taxableIncome);
-  return (
-    ANNUAL_TAX_BRACKETS.find((b) => b.hasta === null || income <= b.hasta) ??
-    ANNUAL_TAX_BRACKETS[ANNUAL_TAX_BRACKETS.length - 1]
-  );
+  const table = bracketsForYear(year);
+  return table.find((b) => b.hasta === null || income <= b.hasta) ?? table[table.length - 1];
 }
 
 /** Impuesto determinado anual según Art. 37 LIR. */
-export function computeAnnualTax(taxableIncome: number): number {
+export function computeAnnualTax(taxableIncome: number, year?: number): number {
   if (!(taxableIncome > 0)) return 0;
-  const b = findBracket(taxableIncome);
+  const b = findBracket(taxableIncome, year);
   if (b.tasa === 0) return 0;
   return round2((round2(taxableIncome) - b.exceso) * b.tasa + b.cuotaFija);
 }
@@ -65,10 +55,16 @@ export function suggestSocialSecurity(gross: number, frequency: FrequencyType) {
 
 export const txYear = (t: Pick<Transaction, 'date'>) => Number(t.date.slice(0, 4));
 
-export function computeSummary(transactions: Transaction[]): TaxSummary {
+/**
+ * @param year ejercicio fiscal; define qué tabla del Art. 37 se usa. Sin año (vista "todos los años") usa la vigente.
+ */
+export function computeSummary(transactions: Transaction[], year?: number): TaxSummary {
+  const rules = rulesForYear(year ?? new Date().getFullYear());
+  const aguinaldoByYear = new Map<number, number>();
   let totalGrossSalary = 0;
   let totalISSS = 0;
   let totalAFP = 0;
+  let totalVialidad = 0;
   let totalIndependentFees = 0;
   let grossDeductibleMedical = 0;
   let grossDeductibleEdu = 0;
@@ -81,6 +77,8 @@ export function computeSummary(transactions: Transaction[]): TaxSummary {
         totalGrossSalary += amount;
         totalISSS += Number(t.isssAmount) || 0;
         totalAFP += Number(t.afpAmount) || 0;
+        totalVialidad += Number(t.vialidadAmount) || 0;
+        if (t.isAguinaldo) aguinaldoByYear.set(txYear(t), (aguinaldoByYear.get(txYear(t)) ?? 0) + amount);
         break;
       case 'INDEPENDENT_FEES':
         totalIndependentFees += amount;
@@ -95,19 +93,34 @@ export function computeSummary(transactions: Transaction[]): TaxSummary {
     totalTaxWithheld += Number(t.taxWithheld) || 0;
   }
 
-  const netSalarySubjectToTax = Math.max(0, totalGrossSalary - totalISSS - totalAFP);
-  const appliedDeductibleMedical = Math.min(grossDeductibleMedical, DEDUCTION_CAP_MEDICAL);
-  const appliedDeductibleEdu = Math.min(grossDeductibleEdu, DEDUCTION_CAP_EDU);
+  let exemptAguinaldo = 0;
+  aguinaldoByYear.forEach((v, y) => (exemptAguinaldo += Math.min(v, rulesForYear(y).aguinaldoCap)));
+  const netSalarySubjectToTax = Math.max(0, totalGrossSalary - totalISSS - totalAFP - exemptAguinaldo);
+  // Art. 29 num. 7: solo salarios y ≤ $9,100 → deducción fija de $1,600 (en lugar de médicos/educativos).
+  const qualifiesFixed =
+    totalIndependentFees === 0 &&
+    totalGrossSalary > 0 &&
+    totalGrossSalary - exemptAguinaldo <= rules.fixedSalaryDeductionLimit;
+  const fixedSalaryDeduction = qualifiesFixed ? rules.fixedSalaryDeduction : 0;
+  const appliedDeductibleMedical = qualifiesFixed ? 0 : Math.min(grossDeductibleMedical, rules.medicalCap);
+  const appliedDeductibleEdu = qualifiesFixed ? 0 : Math.min(grossDeductibleEdu, rules.eduCap);
   const taxableIncome = Math.max(
     0,
-    netSalarySubjectToTax + totalIndependentFees - appliedDeductibleMedical - appliedDeductibleEdu,
+    netSalarySubjectToTax +
+      totalIndependentFees -
+      fixedSalaryDeduction -
+      appliedDeductibleMedical -
+      appliedDeductibleEdu,
   );
-  const calculatedTax = computeAnnualTax(taxableIncome);
+  const calculatedTax = computeAnnualTax(taxableIncome, year);
 
   return {
     totalGrossSalary: round2(totalGrossSalary),
     totalISSS: round2(totalISSS),
     totalAFP: round2(totalAFP),
+    totalVialidad: round2(totalVialidad),
+    exemptAguinaldo: round2(exemptAguinaldo),
+    fixedSalaryDeduction,
     netSalarySubjectToTax: round2(netSalarySubjectToTax),
     totalIndependentFees: round2(totalIndependentFees),
     grossDeductibleMedical: round2(grossDeductibleMedical),

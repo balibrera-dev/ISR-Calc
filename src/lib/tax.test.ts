@@ -13,7 +13,7 @@ const tx = (p: Partial<Transaction>): Transaction => ({
   ...p,
 });
 
-describe('computeAnnualTax (Art. 37 LIR)', () => {
+describe('computeAnnualTax (Art. 37 LIR, tabla 2011, ejercicios <= 2024)', () => {
   it.each([
     [0, 0],
     [-5, 0],
@@ -26,13 +26,45 @@ describe('computeAnnualTax (Art. 37 LIR)', () => {
     [22857.15, 3462.86],
     [30000, 5605.72],
   ])('renta %d -> impuesto %d', (income, tax) => {
-    expect(computeAnnualTax(income)).toBeCloseTo(tax, 2);
+    expect(computeAnnualTax(income, 2024)).toBeCloseTo(tax, 2);
   });
 
   it('brackets are continuous at their limits', () => {
-    expect(findBracket(9142.86).tramo).toBe('II');
-    expect(findBracket(9142.87).tramo).toBe('III');
-    expect(findBracket(22857.15).tramo).toBe('IV');
+    expect(findBracket(9142.86, 2024).tramo).toBe('II');
+    expect(findBracket(9142.87, 2024).tramo).toBe('III');
+    expect(findBracket(22857.15, 2024).tramo).toBe('IV');
+  });
+});
+
+describe('computeAnnualTax (reforma 2025: exento hasta $6,600)', () => {
+  it.each([
+    [6600, 0],
+    [6600.01, 212.12],
+    [8000, 352.12],
+    [15000, 1891.43],
+    [30000, 5605.72],
+  ])('renta %d -> impuesto %d', (income, tax) => {
+    expect(computeAnnualTax(income, 2025)).toBeCloseTo(tax, 2);
+    expect(computeAnnualTax(income)).toBeCloseTo(tax, 2);
+  });
+
+  it('uses the old table only before 2025', () => {
+    expect(computeAnnualTax(5000, 2024)).toBeCloseTo(305.72, 2);
+    expect(computeAnnualTax(5000, 2025)).toBe(0);
+  });
+});
+
+describe('aguinaldo', () => {
+  it('exempts up to $1,500 per year and taxes the excess', () => {
+    const s = computeSummary(
+      [
+        tx({ grossAmount: 14000 }),
+        tx({ grossAmount: 1200, frequency: 'UNICO', isAguinaldo: true }),
+        tx({ date: '2025-12-10', grossAmount: 1800, frequency: 'UNICO', isAguinaldo: true }),
+      ],
+    );
+    expect(s.exemptAguinaldo).toBe(2700);
+    expect(s.netSalarySubjectToTax).toBe(14300);
   });
 });
 
@@ -66,5 +98,24 @@ describe('computeSummary', () => {
     const s = computeSummary([tx({ type: 'INDEPENDENT_FEES', grossAmount: 30000, taxWithheld: 3000 })]);
     expect(s.calculatedTax).toBeCloseTo(5605.72, 2);
     expect(s.finalBalance).toBeCloseTo(2605.72, 2);
+  });
+});
+
+describe('vialidad', () => {
+  it('is totalled but does not reduce taxable income', () => {
+    const s = computeSummary([tx({ grossAmount: 10000, vialidadAmount: 3.43 })]);
+    expect(s.totalVialidad).toBe(3.43);
+    expect(s.taxableIncome).toBe(10000);
+  });
+});
+
+describe('fixed $1,600 salaried deduction', () => {
+  it('applies only with salary-only income up to $9,100, replacing medical/edu', () => {
+    const low = computeSummary([tx({ grossAmount: 9000 }), tx({ type: 'DEDUCTIBLE_MEDICAL', grossAmount: 500 })], 2024);
+    expect(low.fixedSalaryDeduction).toBe(1600);
+    expect(low.appliedDeductibleMedical).toBe(0);
+    expect(low.taxableIncome).toBe(7400);
+    expect(computeSummary([tx({ grossAmount: 9100.01 })]).fixedSalaryDeduction).toBe(0);
+    expect(computeSummary([tx({ grossAmount: 5000 }), tx({ type: 'INDEPENDENT_FEES', grossAmount: 100 })]).fixedSalaryDeduction).toBe(0);
   });
 });

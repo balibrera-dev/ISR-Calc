@@ -1,15 +1,18 @@
-import { useEffect, useState, type FormEvent } from 'react';
-import { Plus, Save, Wand2, X } from 'lucide-react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { Plus, Save, Wand2 } from 'lucide-react';
 import type { FrequencyType, Transaction, TransactionType } from '../types';
 import { FREQUENCY_LABELS, TRANSACTION_TYPE_LABELS } from '../types';
 import { round2, suggestSocialSecurity } from '../lib/tax';
 import { newId, todayISO } from '../lib/format';
-import { Card, Field, btn, inputCls } from './ui';
+import { Field, btn, inputCls } from './ui';
 
 interface Props {
   editing: Transaction | null;
-  onSave: (t: Transaction) => void;
-  onCancelEdit: () => void;
+  /** Fecha inicial para una transacción nueva (según la pestaña activa). */
+  defaultDate: string;
+  /** keepOpen: el usuario eligió "Agregar y otra". */
+  onSave: (t: Transaction, keepOpen: boolean) => void;
+  onCancel: () => void;
 }
 
 interface FormState {
@@ -20,11 +23,14 @@ interface FormState {
   frequency: FrequencyType;
   isssAmount: string;
   afpAmount: string;
+  vialidadAmount: string;
   taxWithheld: string;
+  comment: string;
+  isAguinaldo: boolean;
   autoSS: boolean;
 }
 
-const emptyState = (prev?: FormState): FormState => ({
+const emptyState = (prev?: Partial<FormState>): FormState => ({
   date: prev?.date ?? todayISO(),
   concept: '',
   type: prev?.type ?? 'SALARY_FORMAL',
@@ -32,7 +38,10 @@ const emptyState = (prev?: FormState): FormState => ({
   frequency: prev?.frequency ?? 'MENSUAL',
   isssAmount: '',
   afpAmount: '',
+  vialidadAmount: '',
   taxWithheld: '',
+  comment: '',
+  isAguinaldo: false,
   autoSS: true,
 });
 
@@ -44,7 +53,10 @@ const fromTx = (t: Transaction): FormState => ({
   frequency: t.frequency ?? 'MENSUAL',
   isssAmount: t.isssAmount !== undefined ? String(t.isssAmount) : '',
   afpAmount: t.afpAmount !== undefined ? String(t.afpAmount) : '',
+  vialidadAmount: t.vialidadAmount ? String(t.vialidadAmount) : '',
   taxWithheld: String(t.taxWithheld),
+  comment: t.comment ?? '',
+  isAguinaldo: !!t.isAguinaldo,
   autoSS: false,
 });
 
@@ -53,13 +65,16 @@ const num = (s: string) => {
   return Number.isFinite(n) ? n : 0;
 };
 
-export default function TransactionForm({ editing, onSave, onCancelEdit }: Props) {
-  const [f, setF] = useState<FormState>(() => (editing ? fromTx(editing) : emptyState()));
+export default function TransactionForm({ editing, defaultDate, onSave, onCancel }: Props) {
+  const [f, setF] = useState<FormState>(() => (editing ? fromTx(editing) : emptyState({ date: defaultDate })));
   const [error, setError] = useState<string | null>(null);
+  const keepOpen = useRef(false);
 
   useEffect(() => {
-    setF(editing ? fromTx(editing) : emptyState());
+    setF(editing ? fromTx(editing) : emptyState({ date: defaultDate }));
     setError(null);
+    // Solo al cambiar de transacción: con "Agregar y otra" se conservan tipo, fecha y frecuencia.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editing]);
 
   const isSalary = f.type === 'SALARY_FORMAL';
@@ -83,11 +98,13 @@ export default function TransactionForm({ editing, onSave, onCancelEdit }: Props
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
+    const keep = keepOpen.current;
+    keepOpen.current = false;
     const gross = Number(f.grossAmount);
     if (!f.date) return setError('Ingresa la fecha.');
     if (!Number.isFinite(gross) || gross <= 0) return setError('El monto bruto debe ser mayor que $0.00.');
     const withheld = isDeductible ? 0 : num(f.taxWithheld);
-    if (withheld < 0 || num(f.isssAmount) < 0 || num(f.afpAmount) < 0)
+    if (withheld < 0 || num(f.isssAmount) < 0 || num(f.afpAmount) < 0 || num(f.vialidadAmount) < 0)
       return setError('Los montos no pueden ser negativos.');
 
     const tx: Transaction = {
@@ -99,12 +116,15 @@ export default function TransactionForm({ editing, onSave, onCancelEdit }: Props
       grossAmount: round2(gross),
       taxWithheld: round2(withheld),
     };
+    if (f.comment.trim()) tx.comment = f.comment.trim();
     if (isSalary) {
       tx.frequency = f.frequency;
       tx.isssAmount = round2(num(f.isssAmount));
       tx.afpAmount = round2(num(f.afpAmount));
+      if (f.isAguinaldo) tx.isAguinaldo = true;
+      if (num(f.vialidadAmount) > 0) tx.vialidadAmount = round2(num(f.vialidadAmount));
     }
-    onSave(tx);
+    onSave(tx, keep);
     setError(null);
     if (!editing) setF((prev) => emptyState(prev));
   };
@@ -112,15 +132,6 @@ export default function TransactionForm({ editing, onSave, onCancelEdit }: Props
   const conceptLabel = isSalary ? 'Empleador' : f.type === 'INDEPENDENT_FEES' ? 'Cliente / concepto' : 'Proveedor / concepto';
 
   return (
-    <Card>
-      <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-base font-semibold">{editing ? 'Editar transacción' : 'Nueva transacción'}</h2>
-        {editing && (
-          <button type="button" className={btn.ghost} onClick={onCancelEdit} aria-label="Cancelar edición">
-            <X className="size-4" />
-          </button>
-        )}
-      </div>
       <form onSubmit={submit} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <Field label="Tipo">
           <select className={inputCls} value={f.type} onChange={(e) => set('type', e.target.value as TransactionType)}>
@@ -229,7 +240,28 @@ export default function TransactionForm({ editing, onSave, onCancelEdit }: Props
                 placeholder="0.00"
               />
             </Field>
-            <div className="flex items-end">
+            <Field label="Vialidad ($)" hint="Informativo, no se deduce de la renta.">
+              <input
+                type="number"
+                inputMode="decimal"
+                min="0"
+                step="0.01"
+                className={inputCls}
+                value={f.vialidadAmount}
+                onChange={(e) => set('vialidadAmount', e.target.value)}
+                placeholder="0.00"
+              />
+            </Field>
+            <label className="flex items-center gap-2 text-sm sm:col-span-2">
+              <input
+                type="checkbox"
+                className="size-4 accent-teal-700"
+                checked={f.isAguinaldo}
+                onChange={(e) => set('isAguinaldo', e.target.checked)}
+              />
+              Es aguinaldo <span className="text-xs text-slate-500">(exento de renta hasta $1,500 por año)</span>
+            </label>
+            <div className="flex items-end sm:col-span-2">
               <button type="button" className={`${btn.secondary} w-full`} onClick={applySuggestion}>
                 <Wand2 className="size-4" /> Recalcular ISSS / AFP
               </button>
@@ -237,23 +269,37 @@ export default function TransactionForm({ editing, onSave, onCancelEdit }: Props
           </>
         )}
 
+        <div className="sm:col-span-2">
+          <Field label="Comentario (opcional)">
+            <input
+              className={inputCls}
+              value={f.comment}
+              onChange={(e) => set('comment', e.target.value)}
+              placeholder="Ej. Bono, aguinaldo, ajuste de vacaciones"
+              maxLength={500}
+            />
+          </Field>
+        </div>
+
         {error && (
           <p role="alert" className="text-sm text-red-600 sm:col-span-2 dark:text-red-400">
             {error}
           </p>
         )}
-        <div className="flex gap-2 sm:col-span-2">
+        <div className="flex flex-wrap gap-2 sm:col-span-2">
           <button type="submit" className={`${btn.primary} flex-1`}>
             {editing ? <Save className="size-4" /> : <Plus className="size-4" />}
-            {editing ? 'Guardar cambios' : 'Agregar transacción'}
+            {editing ? 'Guardar cambios' : 'Agregar'}
           </button>
-          {editing && (
-            <button type="button" className={btn.secondary} onClick={onCancelEdit}>
-              Cancelar
+          {!editing && (
+            <button type="submit" className={btn.secondary} onClick={() => (keepOpen.current = true)}>
+              Agregar y otra
             </button>
           )}
+          <button type="button" className={btn.secondary} onClick={onCancel}>
+            Cancelar
+          </button>
         </div>
       </form>
-    </Card>
   );
 }

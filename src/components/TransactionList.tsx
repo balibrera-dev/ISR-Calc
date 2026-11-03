@@ -33,7 +33,7 @@ export default function TransactionList({ transactions, editingId, onEdit, onDel
   const rows = useMemo(() => {
     const q = query.trim().toLowerCase();
     return transactions
-      .filter((t) => (filter === 'ALL' || t.type === filter) && (!q || t.concept.toLowerCase().includes(q)))
+      .filter((t) => (filter === 'ALL' || t.type === filter) && (!q || t.concept.toLowerCase().includes(q) || (t.comment ?? '').toLowerCase().includes(q)))
       .sort((a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt));
   }, [transactions, filter, query]);
 
@@ -48,10 +48,10 @@ export default function TransactionList({ transactions, editingId, onEdit, onDel
             <Search className="pointer-events-none absolute top-2.5 left-2.5 size-4 text-slate-400" />
             <input
               className={`${inputBase} w-full pl-8 sm:w-44`}
-              placeholder="Buscar concepto"
+              placeholder="Buscar"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              aria-label="Buscar concepto"
+              aria-label="Buscar por concepto o comentario"
             />
           </div>
           <select
@@ -94,7 +94,13 @@ export default function TransactionList({ transactions, editingId, onEdit, onDel
                   <p className="truncate text-xs text-slate-500">
                     {formatDate(t.date)} · {TRANSACTION_TYPE_LABELS[t.type]}
                     {t.frequency && ` · ${FREQUENCY_LABELS[t.frequency]}`}
+                    {t.isAguinaldo && ' · Aguinaldo'}
                   </p>
+                  {t.comment && (
+                    <p className="truncate text-xs text-slate-600 italic dark:text-slate-400" title={t.comment}>
+                      {t.comment}
+                    </p>
+                  )}
                 </div>
                 <div className="shrink-0 text-right">
                   <p className={`text-sm font-semibold tabular-nums ${deductible ? 'text-slate-600 dark:text-slate-300' : ''}`}>
@@ -104,6 +110,7 @@ export default function TransactionList({ transactions, editingId, onEdit, onDel
                     {t.type === 'SALARY_FORMAL' && (
                       <span className="hidden sm:inline">
                         ISSS {money(t.isssAmount ?? 0)} · AFP {money(t.afpAmount ?? 0)} ·{' '}
+                        {t.vialidadAmount ? `Vialidad ${money(t.vialidadAmount)} · ` : ''}
                       </span>
                     )}
                     {!deductible && `Ret. ${money(t.taxWithheld)}`}

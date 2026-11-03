@@ -46,8 +46,10 @@ export function parseNumber(v: unknown): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-/** Acepta YYYY-MM-DD, DD/MM/YYYY, serial de Excel o Date. */
-export function parseDate(v: unknown): string | null {
+export type DateOrder = 'DMY' | 'MDY';
+
+/** Acepta YYYY-MM-DD, DD/MM/YYYY (o MM/DD/YYYY con order='MDY'), serial de Excel o Date. */
+export function parseDate(v: unknown, order: DateOrder = 'DMY'): string | null {
   const pad = (n: number) => String(n).padStart(2, '0');
   const ok = (y: number, m: number, d: number) => {
     const dt = new Date(Date.UTC(y, m - 1, d));
@@ -65,17 +67,37 @@ export function parseDate(v: unknown): string | null {
   let m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
   if (m) return ok(+m[1], +m[2], +m[3]);
   m = s.match(/^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})$/);
-  if (m) return ok(+m[3], +m[2], +m[1]);
+  if (m) {
+    const [a, b, y] = [+m[1], +m[2], +m[3]];
+    return order === 'MDY' ? (ok(y, a, b) ?? ok(y, b, a)) : (ok(y, b, a) ?? ok(y, a, b));
+  }
   return null;
 }
+
+export function parseBool(v: unknown): boolean | undefined {
+  if (typeof v === 'boolean') return v;
+  if (typeof v === 'number') return v !== 0;
+  if (typeof v !== 'string' || !v.trim()) return undefined;
+  const s = strip(v);
+  if (['si', 's', 'yes', 'y', 'true', '1', 'x'].includes(s)) return true;
+  if (['no', 'n', 'false', '0'].includes(s)) return false;
+  return undefined;
+}
+
+/** Sin columna "Aguinaldo": un pago único cuyo concepto o comentario dice "aguinaldo" se marca como tal. */
+const looksLikeAguinaldo = (t: Transaction) =>
+  t.frequency === 'UNICO' && /aguinaldo/.test(strip(`${t.concept} ${t.comment ?? ''}`));
 
 export type Result<T> = { ok: true; value: T } | { ok: false; error: string };
 
 /** Valida y normaliza un objeto plano a Transaction. */
-export function normalizeTransaction(raw: Record<string, unknown>): Result<Transaction> {
+export function normalizeTransaction(
+  raw: Record<string, unknown>,
+  dateOrder: DateOrder = 'DMY',
+): Result<Transaction> {
   const type = parseType(raw.type);
   if (!type) return { ok: false, error: `tipo inválido "${String(raw.type ?? '')}"` };
-  const date = parseDate(raw.date);
+  const date = parseDate(raw.date, dateOrder);
   if (!date) return { ok: false, error: `fecha inválida "${String(raw.date ?? '')}"` };
   const gross = parseNumber(raw.grossAmount);
   if (gross === null || gross < 0) return { ok: false, error: 'monto bruto inválido' };
@@ -89,12 +111,16 @@ export function normalizeTransaction(raw: Record<string, unknown>): Result<Trans
     type,
     grossAmount: round2(gross),
     taxWithheld: type === 'DEDUCTIBLE_MEDICAL' || type === 'DEDUCTIBLE_EDU' ? 0 : round2(withheld),
+    ...(String(raw.comment ?? '').trim() ? { comment: String(raw.comment).trim().slice(0, 500) } : {}),
     createdAt: typeof raw.createdAt === 'string' && raw.createdAt ? raw.createdAt : new Date().toISOString(),
   };
   if (type === 'SALARY_FORMAL') {
     t.frequency = parseFrequency(raw.frequency) ?? 'MENSUAL';
     t.isssAmount = round2(Math.max(0, parseNumber(raw.isssAmount) ?? 0));
     t.afpAmount = round2(Math.max(0, parseNumber(raw.afpAmount) ?? 0));
+    if (parseBool(raw.isAguinaldo) ?? looksLikeAguinaldo(t)) t.isAguinaldo = true;
+    const vialidad = parseNumber(raw.vialidadAmount);
+    if (vialidad) t.vialidadAmount = round2(Math.max(0, vialidad));
   }
   return { ok: true, value: t };
 }
