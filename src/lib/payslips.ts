@@ -103,8 +103,11 @@ export function payslipAlerts(list: Transaction[], s: TaxSummary, rules: YearRul
     Math.abs(diff) <= WITHHOLDING_TOLERANCE
       ? {
           level: 'ok',
-          title: 'Renta retenida cuadra con las tablas',
-          detail: `Te retuvieron ${money(withheld)} y las tablas dan ${money(expected)}. Si el F11 te sale a pagar, es porque las tablas asumen la deducción de ${money(rules.fixedSalaryDeduction)}.`,
+          title: 'Tu empresa te retuvo bien la renta',
+          detail:
+            s.finalBalance > 0.005 && s.fixedSalaryDeduction === 0
+              ? `Te retuvieron ${money(withheld)}, justo lo que dicen las tablas de Hacienda. Aun así, en el F11 te toca pagar ${money(s.finalBalance)}: las tablas te descuentan ${money(rules.fixedSalaryDeduction)} que la ley solo da a quien gana hasta ${money(rules.fixedSalaryDeductionLimit)} al año, y tú ganas más.`
+              : `Te retuvieron ${money(withheld)}, justo lo que dicen las tablas de Hacienda.`,
         }
       : {
           level: 'warn',
