@@ -63,6 +63,19 @@ const SRC = {
     label: 'Guía de declaración F11 (Ministerio de Hacienda)',
     url: 'https://www.mh.gob.sv/wp-content/uploads/2020/11/PMHDC8220.pdf',
   },
+  art4: { label: 'Art. 4 LISR (rentas no gravables)', url: 'https://hazconta.com/leyes/ley-de-renta/art-4' },
+  aguinaldoHistoria: {
+    label: 'Historia de la exención del aguinaldo (El Mundo)',
+    url: 'https://diario.elmundo.sv/politica/asamblea-sube-exencion-a-aguinaldos-luego-de-discusion-politica',
+  },
+  aguinaldo2022: {
+    label: 'Exención aguinaldo 2022 (Bloomberg Línea)',
+    url: 'https://www.bloomberglinea.com/2022/12/05/aguinaldo-de-el-salvador-cuando-empezara-a-pagarse-y-como-sera-la-exencion-del-isr/',
+  },
+  aguinaldo2023: {
+    label: 'Decreto aguinaldo 2023 (Contaportable)',
+    url: 'https://www.contaportable.com/wp-content/uploads/2023/12/Decreto-Aguinaldo-Exento-Ano-2023-hasta-1500-dls-.pdf',
+  },
   aguinaldo2024: {
     label: 'Decreto aguinaldo 2024 (ECIJA)',
     url: 'https://ecija.com/sala-de-prensa/alivio-economico-para-los-trabajadores-decreto-legislativo-exonera-el-aguinaldo-de-impuestos-en-el-salvador',
@@ -105,25 +118,67 @@ const BASE_NOTES: LegalNote[] = [
   },
 ];
 
-const AGUINALDO_NOTE = (year: number, source?: LegalNote['source']): LegalNote => ({
-  kind: 'cambio',
-  title: `Aguinaldo exento hasta $1,500 (${year})`,
-  detail: 'Decreto transitorio para este ejercicio: los primeros $1,500 de aguinaldo no pagan renta.',
-  source,
-});
+/**
+ * Aguinaldo (Art. 4 num. 16 LISR, D.L. 458 de 2019): exento hasta 2 salarios mínimos mensuales del
+ * sector comercio y servicios. Varios años un decreto transitorio subió ese tope.
+ */
+const MIN_WAGE_COMMERCE: [fromYear: number, monthly: number][] = [
+  [2025, 408.8], // desde 1-jun-2025 (el aguinaldo se paga en diciembre)
+  [2021, 365.0], // desde 1-ago-2021
+  [0, 304.17],
+];
+const minWageFor = (year: number) => MIN_WAGE_COMMERCE.find(([from]) => year >= from)![1];
 
-const AGUINALDO_UNVERIFIED: LegalNote = {
-  kind: 'aviso',
-  title: 'Aguinaldo: límite por confirmar',
-  detail:
-    'No verificamos el decreto de aguinaldo de este año. La app usa el mismo tope de $1,500; confírmalo antes de declarar.',
+export interface AguinaldoRule {
+  cap: number;
+  /** Texto corto para la nota legal. */
+  basis: string;
+  verified: boolean;
+  source?: LegalNote['source'];
+}
+
+const AGUINALDO_DECREES: Record<number, { cap: number; source?: LegalNote['source'] }> = {
+  2021: { cap: 1100, source: SRC.aguinaldoHistoria },
+  2022: { cap: 1500, source: SRC.aguinaldo2022 },
+  2023: { cap: 1500, source: SRC.aguinaldo2023 },
+  2024: { cap: 1500, source: SRC.aguinaldo2024 },
+  2025: { cap: 1500, source: SRC.aguinaldo2025 },
+  2026: { cap: 1500, source: SRC.aguinaldo2026 },
 };
 
-/** Cambios por año. Lo que no se define aquí hereda los valores base. */
-const YEAR_OVERRIDES: Record<number, { notes: LegalNote[]; aguinaldoVerified?: boolean }> = {
-  2024: { notes: [AGUINALDO_NOTE(2024, SRC.aguinaldo2024)], aguinaldoVerified: true },
+export function aguinaldoRuleFor(year: number): AguinaldoRule {
+  const decree = AGUINALDO_DECREES[year];
+  if (decree) return { cap: decree.cap, basis: `Decreto transitorio ${year}`, verified: true, source: decree.source };
+  const wage = minWageFor(year);
+  return {
+    cap: Math.round(wage * 2 * 100) / 100,
+    basis: `Art. 4 num. 16: 2 salarios mínimos de comercio (2 × $${wage.toFixed(2)})`,
+    verified: false,
+    source: SRC.art4,
+  };
+}
+
+function aguinaldoNote(year: number): LegalNote {
+  const r = aguinaldoRuleFor(year);
+  const cap = `$${r.cap.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+  return r.verified
+    ? {
+        kind: 'cambio',
+        title: `Aguinaldo exento hasta ${cap} (${year})`,
+        detail: `${r.basis}: los primeros ${cap} de aguinaldo no pagan renta; solo el excedente se suma a la renta imponible.`,
+        source: r.source,
+      }
+    : {
+        kind: 'aviso',
+        title: `Aguinaldo exento hasta ${cap} (por confirmar)`,
+        detail: `No encontramos decreto transitorio para ${year}, así que se aplica la ley base: ${r.basis}. Si hubo decreto, el tope puede ser mayor.`,
+        source: r.source,
+      };
+}
+
+/** Cambios por año (además de la nota de aguinaldo, que se genera para todos). */
+const YEAR_OVERRIDES: Record<number, { notes: LegalNote[] }> = {
   2025: {
-    aguinaldoVerified: true,
     notes: [
       {
         kind: 'cambio',
@@ -144,17 +199,14 @@ const YEAR_OVERRIDES: Record<number, { notes: LegalNote[]; aguinaldoVerified?: b
         detail:
           'La app usa la tabla reformada para todo el ejercicio 2025. Confirma con Hacienda o un contador cómo se trata enero–abril.',
       },
-      AGUINALDO_NOTE(2025, SRC.aguinaldo2025),
     ],
   },
-  2026: { notes: [AGUINALDO_NOTE(2026, SRC.aguinaldo2026)], aguinaldoVerified: true },
 };
 
 export function rulesForYear(year: number): YearRules {
   const reformed = year >= REFORM_2025_YEAR;
   const override = YEAR_OVERRIDES[year];
-  const notes = [...(override?.notes ?? [])];
-  if (!override?.aguinaldoVerified) notes.push(AGUINALDO_UNVERIFIED);
+  const notes = [...(override?.notes ?? []), aguinaldoNote(year)];
   if (!reformed)
     notes.unshift({
       kind: 'ley',
@@ -167,7 +219,7 @@ export function rulesForYear(year: number): YearRules {
     bracketsLabel: reformed ? 'Reforma 2025: exento hasta $6,600 anuales' : 'Tabla 2011: exento hasta $4,064 anuales',
     medicalCap: 800,
     eduCap: 800,
-    aguinaldoCap: 1500,
+    aguinaldoCap: aguinaldoRuleFor(year).cap,
     fixedSalaryDeduction: 1600,
     fixedSalaryDeductionLimit: 9100,
     notes: [...notes, ...BASE_NOTES],

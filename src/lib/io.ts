@@ -13,7 +13,6 @@ export const COLUMNS: { header: string; key: keyof Transaction }[] = [
   { header: 'ISSS', key: 'isssAmount' },
   { header: 'AFP', key: 'afpAmount' },
   { header: 'Vialidad', key: 'vialidadAmount' },
-  { header: 'Aguinaldo', key: 'isAguinaldo' },
   { header: 'Renta Retenida', key: 'taxWithheld' },
   { header: 'Comentario', key: 'comment' },
   { header: 'ID', key: 'id' },
@@ -21,7 +20,8 @@ export const COLUMNS: { header: string; key: keyof Transaction }[] = [
 ];
 
 const strip = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toLowerCase();
-const HEADER_LOOKUP = new Map<string, keyof Transaction>();
+/** Columnas antiguas (p. ej. "Aguinaldo" = Sí) se leen aunque ya no se exporten. */
+const HEADER_LOOKUP = new Map<string, string>();
 for (const c of COLUMNS) {
   HEADER_LOOKUP.set(strip(c.header), c.key);
   HEADER_LOOKUP.set(strip(c.key), c.key);
@@ -30,6 +30,7 @@ for (const [alias, key] of [
   ['comment', 'comment'],
   ['comentarios', 'comment'],
   ['nota', 'comment'],
+  ['aguinaldo', 'isAguinaldo'],
   ['notas', 'comment'],
   ['renta', 'taxWithheld'],
   ['monto', 'grossAmount'],
@@ -48,7 +49,6 @@ function toRows(list: Transaction[]) {
       ISSS: t.isssAmount ?? '',
       AFP: t.afpAmount ?? '',
       Vialidad: t.vialidadAmount ?? '',
-      Aguinaldo: t.isAguinaldo ? 'Sí' : '',
       'Renta Retenida': t.taxWithheld,
       Comentario: t.comment ?? '',
       ID: t.id,
@@ -63,8 +63,10 @@ function summaryRows(s: TaxSummary, year: number) {
     ['(-) ISSS', s.totalISSS],
     ['(-) AFP', s.totalAFP],
     ['Vialidad (informativo, no deducible)', s.totalVialidad],
-    ['(-) Aguinaldo exento (máx. $1,500/año)', s.exemptAguinaldo],
     ['Salario neto gravado', s.netSalarySubjectToTax],
+    ['Aguinaldo recibido', s.totalAguinaldo],
+    ['Aguinaldo exento (tope del año)', s.exemptAguinaldo],
+    ['Aguinaldo gravado (excedente)', s.taxableAguinaldo],
     ['Honorarios brutos', s.totalIndependentFees],
     ['(-) Deducción fija asalariados (≤ $9,100)', s.fixedSalaryDeduction],
     ['Gastos médicos (facturados)', s.grossDeductibleMedical],
@@ -94,7 +96,7 @@ function legendRows() {
 export function exportXlsx(list: Transaction[], summaries: [number, TaxSummary][]) {
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.json_to_sheet(toRows(list), { header: COLUMNS.map((c) => c.header) });
-  ws['!cols'] = [12, 32, 20, 14, 13, 10, 10, 10, 10, 15, 36, 38, 26].map((wch) => ({ wch }));
+  ws['!cols'] = [12, 32, 20, 14, 13, 10, 10, 10, 15, 36, 38, 26].map((wch) => ({ wch }));
   XLSX.utils.book_append_sheet(wb, ws, 'Transacciones');
   for (const [year, summary] of [...summaries].sort((a, b) => b[0] - a[0])) {
     const sum = XLSX.utils.aoa_to_sheet(summaryRows(summary, year));

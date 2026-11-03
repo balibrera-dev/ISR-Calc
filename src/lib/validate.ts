@@ -10,6 +10,7 @@ const strip = (s: string) =>
   s.normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toLowerCase();
 
 const TYPE_ALIASES: Record<string, TransactionType> = {
+  aguinaldo: 'AGUINALDO',
   salario: 'SALARY_FORMAL',
   'salario (planilla)': 'SALARY_FORMAL',
   planilla: 'SALARY_FORMAL',
@@ -84,9 +85,12 @@ export function parseBool(v: unknown): boolean | undefined {
   return undefined;
 }
 
-/** Sin columna "Aguinaldo": un pago único cuyo concepto o comentario dice "aguinaldo" se marca como tal. */
-const looksLikeAguinaldo = (t: Transaction) =>
-  t.frequency === 'UNICO' && /aguinaldo/.test(strip(`${t.concept} ${t.comment ?? ''}`));
+/**
+ * Un salario de pago único cuyo concepto o comentario dice "aguinaldo" se trata como aguinaldo,
+ * igual que la columna Aguinaldo = Sí o el flag isAguinaldo de versiones anteriores.
+ */
+const looksLikeAguinaldo = (raw: Record<string, unknown>, frequency: FrequencyType | undefined) =>
+  frequency === 'UNICO' && /aguinaldo/.test(strip(`${raw.concept ?? ''} ${raw.comment ?? ''}`));
 
 export type Result<T> = { ok: true; value: T } | { ok: false; error: string };
 
@@ -95,7 +99,11 @@ export function normalizeTransaction(
   raw: Record<string, unknown>,
   dateOrder: DateOrder = 'DMY',
 ): Result<Transaction> {
-  const type = parseType(raw.type);
+  let type = parseType(raw.type);
+  if (type === 'SALARY_FORMAL') {
+    const flag = parseBool(raw.isAguinaldo);
+    if (flag ?? looksLikeAguinaldo(raw, parseFrequency(raw.frequency))) type = 'AGUINALDO';
+  }
   if (!type) return { ok: false, error: `tipo inválido "${String(raw.type ?? '')}"` };
   const date = parseDate(raw.date, dateOrder);
   if (!date) return { ok: false, error: `fecha inválida "${String(raw.date ?? '')}"` };
@@ -118,7 +126,6 @@ export function normalizeTransaction(
     t.frequency = parseFrequency(raw.frequency) ?? 'MENSUAL';
     t.isssAmount = round2(Math.max(0, parseNumber(raw.isssAmount) ?? 0));
     t.afpAmount = round2(Math.max(0, parseNumber(raw.afpAmount) ?? 0));
-    if (parseBool(raw.isAguinaldo) ?? looksLikeAguinaldo(t)) t.isAguinaldo = true;
     const vialidad = parseNumber(raw.vialidadAmount);
     if (vialidad) t.vialidadAmount = round2(Math.max(0, vialidad));
   }

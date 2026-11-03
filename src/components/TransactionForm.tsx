@@ -3,6 +3,8 @@ import { Plus, Save, Wand2 } from 'lucide-react';
 import type { FrequencyType, Transaction, TransactionType } from '../types';
 import { FREQUENCY_LABELS, TRANSACTION_TYPE_LABELS } from '../types';
 import { round2, suggestSocialSecurity } from '../lib/tax';
+import { aguinaldoRuleFor } from '../lib/rules';
+import { money } from '../lib/format';
 import { newId, todayISO } from '../lib/format';
 import { Field, btn, inputCls } from './ui';
 
@@ -26,7 +28,6 @@ interface FormState {
   vialidadAmount: string;
   taxWithheld: string;
   comment: string;
-  isAguinaldo: boolean;
   autoSS: boolean;
 }
 
@@ -41,7 +42,6 @@ const emptyState = (prev?: Partial<FormState>): FormState => ({
   vialidadAmount: '',
   taxWithheld: '',
   comment: '',
-  isAguinaldo: false,
   autoSS: true,
 });
 
@@ -56,7 +56,6 @@ const fromTx = (t: Transaction): FormState => ({
   vialidadAmount: t.vialidadAmount ? String(t.vialidadAmount) : '',
   taxWithheld: String(t.taxWithheld),
   comment: t.comment ?? '',
-  isAguinaldo: !!t.isAguinaldo,
   autoSS: false,
 });
 
@@ -121,7 +120,6 @@ export default function TransactionForm({ editing, defaultDate, onSave, onCancel
       tx.frequency = f.frequency;
       tx.isssAmount = round2(num(f.isssAmount));
       tx.afpAmount = round2(num(f.afpAmount));
-      if (f.isAguinaldo) tx.isAguinaldo = true;
       if (num(f.vialidadAmount) > 0) tx.vialidadAmount = round2(num(f.vialidadAmount));
     }
     onSave(tx, keep);
@@ -129,7 +127,12 @@ export default function TransactionForm({ editing, defaultDate, onSave, onCancel
     if (!editing) setF((prev) => emptyState(prev));
   };
 
-  const conceptLabel = isSalary ? 'Empleador' : f.type === 'INDEPENDENT_FEES' ? 'Cliente / concepto' : 'Proveedor / concepto';
+  const isAguinaldo = f.type === 'AGUINALDO';
+  const conceptLabel =
+    isSalary || isAguinaldo ? 'Empleador' : f.type === 'INDEPENDENT_FEES' ? 'Cliente / concepto' : 'Proveedor / concepto';
+  const agYear = Number(f.date.slice(0, 4)) || new Date().getFullYear();
+  const agRule = aguinaldoRuleFor(agYear);
+  const agHint = `Exento hasta ${money(agRule.cap)} en ${agYear}${agRule.verified ? '' : ' (por confirmar)'}; el excedente paga renta.`;
 
   return (
       <form onSubmit={submit} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -151,7 +154,7 @@ export default function TransactionForm({ editing, defaultDate, onSave, onCancel
               className={inputCls}
               value={f.concept}
               onChange={(e) => set('concept', e.target.value)}
-              placeholder={isSalary ? 'Ej. Empresa S.A. de C.V.' : isDeductible ? 'Ej. Hospital / Colegio' : 'Ej. Cliente XYZ'}
+              placeholder={isSalary || isAguinaldo ? 'Ej. Empresa S.A. de C.V.' : isDeductible ? 'Ej. Hospital / Colegio' : 'Ej. Cliente XYZ'}
               maxLength={120}
             />
           </Field>
@@ -184,7 +187,10 @@ export default function TransactionForm({ editing, defaultDate, onSave, onCancel
             </select>
           </Field>
         ) : !isDeductible ? (
-          <Field label="Renta retenida ($)" hint="Usualmente 10% en servicios profesionales.">
+          <Field
+            label="Renta retenida ($)"
+            hint={isAguinaldo ? agHint : 'Usualmente 10% en servicios profesionales.'}
+          >
             <input
               type="number"
               inputMode="decimal"
@@ -252,15 +258,6 @@ export default function TransactionForm({ editing, defaultDate, onSave, onCancel
                 placeholder="0.00"
               />
             </Field>
-            <label className="flex items-center gap-2 text-sm sm:col-span-2">
-              <input
-                type="checkbox"
-                className="size-4 accent-teal-700"
-                checked={f.isAguinaldo}
-                onChange={(e) => set('isAguinaldo', e.target.checked)}
-              />
-              Es aguinaldo <span className="text-xs text-slate-500">(exento de renta hasta $1,500 por año)</span>
-            </label>
             <div className="flex items-end sm:col-span-2">
               <button type="button" className={`${btn.secondary} w-full`} onClick={applySuggestion}>
                 <Wand2 className="size-4" /> Recalcular ISSS / AFP
@@ -275,7 +272,7 @@ export default function TransactionForm({ editing, defaultDate, onSave, onCancel
               className={inputCls}
               value={f.comment}
               onChange={(e) => set('comment', e.target.value)}
-              placeholder="Ej. Bono, aguinaldo, ajuste de vacaciones"
+              placeholder="Ej. Bono, ajuste de vacaciones"
               maxLength={500}
             />
           </Field>
