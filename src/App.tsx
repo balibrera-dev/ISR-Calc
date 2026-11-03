@@ -10,6 +10,8 @@ import TransactionList from './components/TransactionList';
 import SummaryPanel from './components/SummaryPanel';
 import LegalPanel from './components/LegalPanel';
 import YearTabs from './components/YearTabs';
+import YearAlerts from './components/YearAlerts';
+import { yearAlerts } from './lib/alerts';
 import Dialog from './components/Dialog';
 import { btn } from './components/ui';
 
@@ -68,6 +70,7 @@ export default function App() {
   const visible = byYear.get(year) ?? [];
   const rules = useMemo(() => rulesForYear(year), [year]);
   const summary = useMemo(() => computeSummary(visible, year), [visible, year]);
+  const alerts = useMemo(() => yearAlerts(visible, summary, rules), [visible, summary, rules]);
 
   const editing = dialog && dialog !== 'new' ? dialog : null;
   const defaultDate = year === CURRENT_YEAR ? todayISO() : `${year}-12-31`;
@@ -217,6 +220,7 @@ export default function App() {
         className="mx-auto grid max-w-7xl grid-cols-1 gap-6 px-4 py-6 lg:grid-cols-[minmax(0,1fr)_380px]"
       >
         <div className="min-w-0 space-y-6">
+          <YearAlerts alerts={alerts} />
           <TransactionList
             transactions={visible}
             editingId={editing?.id ?? null}

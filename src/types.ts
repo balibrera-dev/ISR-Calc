@@ -4,6 +4,10 @@ export type TransactionType =
   | 'SALARY_FORMAL' // Salario en planilla (relación de dependencia)
   | 'INDEPENDENT_FEES' // Honorarios / servicios profesionales
   | 'AGUINALDO' // Aguinaldo: exento hasta el tope del año, el excedente es gravado
+  | 'INDEMNIZACION' // Indemnización por despido / retiro: exenta hasta 30 días de salario por año de servicio
+  | 'BUSINESS_INCOME' // Ventas / ingresos de negocio propio
+  | 'RENTAL_INCOME' // Alquiler cobrado
+  | 'BUSINESS_EXPENSE' // Costo o gasto con factura del negocio o del inmueble alquilado
   | 'DEDUCTIBLE_MEDICAL' // Deducción por gastos médicos
   | 'DEDUCTIBLE_EDU'; // Deducción por gastos educativos
 
@@ -20,6 +24,10 @@ export interface Transaction {
   afpAmount?: number;
   vialidadAmount?: number; // Contribución de vialidad retenida en planilla (no deducible de renta)
 
+  // INDEMNIZACION (opcionales: sin ellos se asume la indemnización legal, exenta completa)
+  serviceYears?: number; // Años de servicio
+  baseSalary?: number; // Salario mensual base (promedio de los últimos 12 meses)
+
   taxWithheld: number;
   comment?: string; // Nota libre del usuario
   createdAt: string;
@@ -33,10 +41,18 @@ export interface TaxSummary {
   totalAguinaldo: number; // Aguinaldo recibido
   exemptAguinaldo: number; // Parte exenta (tope del año, ver rules.ts)
   taxableAguinaldo: number; // Excedente que se suma a la renta imponible
+  totalIndemnizacion: number; // Indemnización recibida
+  exemptIndemnizacion: number; // Parte exenta (Art. 4 num. 3)
+  taxableIndemnizacion: number; // Excedente gravado
   fixedSalaryDeduction: number; // $1,600 si solo hay salarios y son ≤ $9,100
   netSalarySubjectToTax: number;
 
   totalIndependentFees: number;
+
+  totalBusinessIncome: number; // Ventas del negocio
+  totalRentalIncome: number; // Alquileres cobrados
+  totalBusinessExpense: number; // Costos y gastos con factura
+  netOtherIncome: number; // Negocio + alquiler − gastos (mínimo 0)
 
   grossDeductibleMedical: number;
   appliedDeductibleMedical: number;
@@ -54,6 +70,10 @@ export const TRANSACTION_TYPE_LABELS: Record<TransactionType, string> = {
   SALARY_FORMAL: 'Salario (planilla)',
   INDEPENDENT_FEES: 'Honorarios / servicios profesionales',
   AGUINALDO: 'Aguinaldo',
+  INDEMNIZACION: 'Indemnización por despido',
+  BUSINESS_INCOME: 'Ventas de negocio propio',
+  RENTAL_INCOME: 'Alquiler cobrado',
+  BUSINESS_EXPENSE: 'Costo o gasto de negocio/alquiler',
   DEDUCTIBLE_MEDICAL: 'Gasto médico deducible',
   DEDUCTIBLE_EDU: 'Gasto educativo deducible',
 };
@@ -66,4 +86,13 @@ export const FREQUENCY_LABELS: Record<FrequencyType, string> = {
 };
 
 export const isIncome = (t: TransactionType) =>
-  t === 'SALARY_FORMAL' || t === 'INDEPENDENT_FEES' || t === 'AGUINALDO';
+  t === 'SALARY_FORMAL' ||
+  t === 'INDEPENDENT_FEES' ||
+  t === 'AGUINALDO' ||
+  t === 'INDEMNIZACION' ||
+  t === 'BUSINESS_INCOME' ||
+  t === 'RENTAL_INCOME';
+
+/** Tipos que no llevan renta retenida (gastos). */
+export const isExpense = (t: TransactionType) =>
+  t === 'DEDUCTIBLE_MEDICAL' || t === 'DEDUCTIBLE_EDU' || t === 'BUSINESS_EXPENSE';

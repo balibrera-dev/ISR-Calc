@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
-import { BriefcaseBusiness, Gift, GraduationCap, HeartPulse, Pencil, Search, Trash2, Wallet } from 'lucide-react';
+import { BriefcaseBusiness, Gift, GraduationCap, HandCoins, House, Receipt, Store, HeartPulse, Pencil, Search, Trash2, Wallet } from 'lucide-react';
 import type { Transaction, TransactionType } from '../types';
-import { FREQUENCY_LABELS, TRANSACTION_TYPE_LABELS } from '../types';
+import { FREQUENCY_LABELS, TRANSACTION_TYPE_LABELS, isExpense } from '../types';
 import { formatDate, money } from '../lib/format';
 import { Card, btn, inputBase } from './ui';
 
@@ -9,6 +9,10 @@ const ICONS: Record<TransactionType, typeof Wallet> = {
   SALARY_FORMAL: Wallet,
   INDEPENDENT_FEES: BriefcaseBusiness,
   AGUINALDO: Gift,
+  INDEMNIZACION: HandCoins,
+  BUSINESS_INCOME: Store,
+  RENTAL_INCOME: House,
+  BUSINESS_EXPENSE: Receipt,
   DEDUCTIBLE_MEDICAL: HeartPulse,
   DEDUCTIBLE_EDU: GraduationCap,
 };
@@ -17,6 +21,10 @@ const BADGE: Record<TransactionType, string> = {
   SALARY_FORMAL: 'bg-teal-100 text-teal-800 dark:bg-teal-900/50 dark:text-teal-300',
   INDEPENDENT_FEES: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/50 dark:text-indigo-300',
   AGUINALDO: 'bg-fuchsia-100 text-fuchsia-800 dark:bg-fuchsia-900/50 dark:text-fuchsia-300',
+  INDEMNIZACION: 'bg-sky-100 text-sky-800 dark:bg-sky-900/50 dark:text-sky-300',
+  BUSINESS_INCOME: 'bg-lime-100 text-lime-800 dark:bg-lime-900/50 dark:text-lime-300',
+  RENTAL_INCOME: 'bg-orange-100 text-orange-800 dark:bg-orange-900/50 dark:text-orange-300',
+  BUSINESS_EXPENSE: 'bg-stone-200 text-stone-800 dark:bg-stone-800 dark:text-stone-300',
   DEDUCTIBLE_MEDICAL: 'bg-rose-100 text-rose-800 dark:bg-rose-900/50 dark:text-rose-300',
   DEDUCTIBLE_EDU: 'bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300',
 };
@@ -82,7 +90,7 @@ export default function TransactionList({ transactions, editingId, onEdit, onDel
         <ul className="divide-y divide-slate-100 dark:divide-slate-800">
           {rows.map((t) => {
             const Icon = ICONS[t.type];
-            const deductible = t.type === 'DEDUCTIBLE_MEDICAL' || t.type === 'DEDUCTIBLE_EDU';
+            const deductible = isExpense(t.type);
             return (
               <li
                 key={t.id}

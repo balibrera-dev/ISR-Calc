@@ -136,3 +136,52 @@ describe('fixed $1,600 salaried deduction', () => {
     expect(computeSummary([tx({ grossAmount: 5000 }), tx({ type: 'INDEPENDENT_FEES', grossAmount: 100 })]).fixedSalaryDeduction).toBe(0);
   });
 });
+
+describe('indemnización', () => {
+  const ind = (p: Partial<Transaction>) => tx({ type: 'INDEMNIZACION', date: '2022-06-30', ...p });
+
+  it('is fully exempt when years or salary are missing (legal indemnización)', () => {
+    const s = computeSummary([tx({ grossAmount: 14000, date: '2022-12-31' }), ind({ grossAmount: 4000 })], 2022);
+    expect(s.totalIndemnizacion).toBe(4000);
+    expect(s.exemptIndemnizacion).toBe(4000);
+    expect(s.taxableIndemnizacion).toBe(0);
+    expect(s.taxableIncome).toBe(14000);
+  });
+
+  it('taxes only what exceeds 30 days of salary per year of service', () => {
+    const s = computeSummary(
+      [tx({ grossAmount: 14000, date: '2022-12-31' }), ind({ grossAmount: 5000, serviceYears: 3, baseSalary: 1200 })],
+      2022,
+    );
+    expect(s.exemptIndemnizacion).toBe(3600);
+    expect(s.taxableIndemnizacion).toBe(1400);
+    expect(s.taxableIncome).toBe(15400);
+  });
+});
+
+describe('negocio propio y alquileres', () => {
+  it('taxes sales + rent minus expenses and drops the $1,600 fixed deduction', () => {
+    const s = computeSummary(
+      [
+        tx({ grossAmount: 6000, date: '2026-06-30' }),
+        tx({ type: 'BUSINESS_INCOME', grossAmount: 3000, taxWithheld: 52.5 }),
+        tx({ type: 'RENTAL_INCOME', grossAmount: 1200 }),
+        tx({ type: 'BUSINESS_EXPENSE', grossAmount: 1700 }),
+      ],
+      2026,
+    );
+    expect(s.netOtherIncome).toBe(2500);
+    expect(s.fixedSalaryDeduction).toBe(0);
+    expect(s.taxableIncome).toBe(8500);
+    expect(s.totalTaxWithheld).toBe(52.5);
+  });
+
+  it('does not let a business loss reduce salary', () => {
+    const s = computeSummary(
+      [tx({ grossAmount: 12000 }), tx({ type: 'BUSINESS_INCOME', grossAmount: 500 }), tx({ type: 'BUSINESS_EXPENSE', grossAmount: 900 })],
+      2026,
+    );
+    expect(s.netOtherIncome).toBe(0);
+    expect(s.taxableIncome).toBe(12000);
+  });
+});

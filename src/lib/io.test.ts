@@ -112,3 +112,30 @@ describe('aguinaldo type', () => {
     expect(transactions[0].type).toBe('AGUINALDO');
   });
 });
+
+describe('indemnización import', () => {
+  it('reads type aliases and the optional years / salary columns', () => {
+    const { transactions } = rowsToTransactions([
+      { Fecha: '2022-06-30', Tipo: 'Indemnización', 'Monto Bruto': 3600, 'Años de servicio': 3, 'Salario base': 1200 },
+      { Fecha: '2022-06-30', Tipo: 'Liquidación', 'Monto Bruto': 100 },
+    ]);
+    expect(transactions[0]).toMatchObject({ type: 'INDEMNIZACION', serviceYears: 3, baseSalary: 1200 });
+    expect(transactions[1].type).toBe('INDEMNIZACION');
+    expect(transactions[1].serviceYears).toBeUndefined();
+  });
+});
+
+describe('negocio import', () => {
+  it('maps business, rental and expense aliases and zeroes expense withholding', () => {
+    const { transactions } = rowsToTransactions([
+      { Fecha: '2026-03-31', Tipo: 'Ventas', 'Monto Bruto': 500, 'Renta Retenida': 8.75 },
+      { Fecha: '2026-03-31', Tipo: 'Alquiler', 'Monto Bruto': 300 },
+      { Fecha: '2026-03-31', Tipo: 'Gasto', 'Monto Bruto': 120, 'Renta Retenida': 5 },
+    ]);
+    expect(transactions.map((t) => [t.type, t.taxWithheld])).toEqual([
+      ['BUSINESS_INCOME', 8.75],
+      ['RENTAL_INCOME', 0],
+      ['BUSINESS_EXPENSE', 0],
+    ]);
+  });
+});
