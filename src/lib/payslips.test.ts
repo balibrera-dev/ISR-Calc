@@ -31,7 +31,7 @@ function cleanYear(): Transaction[] {
 describe('payslipAlerts', () => {
   it('is quiet (only the green renta check) for correct payslips', () => {
     const a = check(cleanYear());
-    expect(a.map((x) => [x.level, x.title])).toEqual([['ok', 'Renta retenida cuadra con las tablas']]);
+    expect(a.map((x) => [x.level, x.title])).toEqual([['ok', 'Tu empresa te retuvo bien la renta']]);
   });
 
   it('flags ISSS above $30 in a month and AFP above 7.25%', () => {
