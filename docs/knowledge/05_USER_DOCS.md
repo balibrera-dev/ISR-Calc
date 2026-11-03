@@ -21,6 +21,10 @@
 - **Costo o gasto de negocio/alquiler:** facturas de lo que gastaste para vender o mantener el inmueble. Se restan de ventas y alquileres; si no tienes el detalle, puedes poner directamente tu ganancia como venta.
 - Cada año muestra avisos: si pierdes la deducción de $1,600, si te toca inscribirte en IVA y si te falta pago a cuenta.
 
+## Revisión de boletas
+- Cada año revisa tus salarios: ISSS cobrado de más (máx. $30 al mes), AFP arriba del 7.25%, boletas repetidas o de más, y si la renta retenida cuadra con las tablas de retención.
+- Si la renta cuadra y aun así el F11 te sale a pagar, es normal: las tablas asumen la deducción de $1,600 que no te aplica si ganas más de $9,100.
+
 ## Importar / exportar
 - Exportar: **Excel** con todas las transacciones + una hoja `Resumen AAAA` por año + Códigos; **CSV** con todas las transacciones. Úsalo como respaldo (los datos viven solo en el navegador).
 - Importar `.xlsx` / `.csv`. Columnas: `Fecha, Concepto, Tipo, Monto Bruto, Frecuencia, ISSS, AFP, Vialidad, Renta Retenida, Comentario, ID, Creado` (también acepta `Comment`).
