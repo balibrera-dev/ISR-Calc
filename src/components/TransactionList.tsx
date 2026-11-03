@@ -48,10 +48,10 @@ export default function TransactionList({ transactions, editingId, onEdit, onDel
             <Search className="pointer-events-none absolute top-2.5 left-2.5 size-4 text-slate-400" />
             <input
               className={`${inputBase} w-full pl-8 sm:w-44`}
-              placeholder="Buscar concepto o nota"
+              placeholder="Buscar"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              aria-label="Buscar concepto"
+              aria-label="Buscar por concepto o comentario"
             />
           </div>
           <select
