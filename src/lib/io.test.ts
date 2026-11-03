@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import * as XLSX from 'xlsx';
-import { mergeTransactions, parseWorkbook, rowsToTransactions } from './io';
+import { detectDateOrder, mergeTransactions, parseWorkbook, rowsToTransactions } from './io';
 import { parseDate, parseNumber } from './validate';
 
 describe('validate helpers', () => {
@@ -57,5 +57,39 @@ describe('mergeTransactions', () => {
     const r = mergeTransactions(a, b);
     expect(r).toMatchObject({ added: 1, updated: 1 });
     expect(r.list.find((t) => t.id === 'a')?.grossAmount).toBe(2);
+  });
+});
+
+describe('historical CSV with Vialidad, Comment, UNICO and MM/DD/YYYY dates', () => {
+  const csv = [
+    'Fecha,Concepto,Tipo,Monto Bruto,Frecuencia,Vialidad,ISSS,AFP,Renta Retenida,Comment',
+    '10/23/2026,"EMPRESA, S.A. DE C.V",SALARY_FORMAL,576.92,CATORCENAL,,12.69,41.83,44.96,',
+    '1/16/2026,"EMPRESA, S.A. DE C.V",SALARY_FORMAL,576.92,CATORCENAL,3.43,12.69,41.83,44.96,',
+    ',,,,,,,,,',
+    '12/10/2025,"EMPRESA, S.A. DE C.V",SALARY_FORMAL,1236.26,UNICO,,0,0,0,Pago de Aguinaldo',
+    '7/24/2020,"EMPRESA, S.A. DE C.V",SALARY_FORMAL,,CATORCENAL,,,,,',
+  ].join('\n');
+  const { transactions, errors } = parseWorkbook(new TextEncoder().encode(csv).buffer as ArrayBuffer);
+
+  it('detects US month/day order and keeps commas inside quoted concepts', () => {
+    expect(transactions.map((t) => t.date)).toEqual(['2026-10-23', '2026-01-16', '2025-12-10']);
+    expect(transactions[0].concept).toBe('EMPRESA, S.A. DE C.V');
+  });
+
+  it('imports vialidad, comments and one-time payments', () => {
+    expect(transactions[1].vialidadAmount).toBe(3.43);
+    expect(transactions[0].vialidadAmount).toBeUndefined();
+    expect(transactions[2]).toMatchObject({ frequency: 'UNICO', comment: 'Pago de Aguinaldo', grossAmount: 1236.26 });
+  });
+
+  it('skips blank rows and reports rows without an amount', () => {
+    expect(errors).toEqual(['Fila 6: monto bruto inválido']);
+  });
+});
+
+describe('detectDateOrder', () => {
+  it('defaults to day/month and switches when the second part exceeds 12', () => {
+    expect(detectDateOrder(['01/02/2026', '15/03/2026'])).toBe('DMY');
+    expect(detectDateOrder(['1/2/2026', '3/15/2026'])).toBe('MDY');
   });
 });

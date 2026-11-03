@@ -68,3 +68,11 @@ describe('computeSummary', () => {
     expect(s.finalBalance).toBeCloseTo(2605.72, 2);
   });
 });
+
+describe('vialidad', () => {
+  it('is totalled but does not reduce taxable income', () => {
+    const s = computeSummary([tx({ grossAmount: 10000, vialidadAmount: 3.43 })]);
+    expect(s.totalVialidad).toBe(3.43);
+    expect(s.taxableIncome).toBe(10000);
+  });
+});

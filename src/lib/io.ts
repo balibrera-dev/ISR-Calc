@@ -1,7 +1,7 @@
 import * as XLSX from 'xlsx';
 import type { Transaction, TaxSummary } from '../types';
 import { FREQUENCY_LABELS, TRANSACTION_TYPE_LABELS } from '../types';
-import { normalizeTransaction } from './validate';
+import { normalizeTransaction, type DateOrder } from './validate';
 
 /** Columnas del archivo: encabezado en español -> campo del modelo. */
 export const COLUMNS: { header: string; key: keyof Transaction }[] = [
@@ -12,7 +12,9 @@ export const COLUMNS: { header: string; key: keyof Transaction }[] = [
   { header: 'Frecuencia', key: 'frequency' },
   { header: 'ISSS', key: 'isssAmount' },
   { header: 'AFP', key: 'afpAmount' },
+  { header: 'Vialidad', key: 'vialidadAmount' },
   { header: 'Renta Retenida', key: 'taxWithheld' },
+  { header: 'Comentario', key: 'comment' },
   { header: 'ID', key: 'id' },
   { header: 'Creado', key: 'createdAt' },
 ];
@@ -23,6 +25,15 @@ for (const c of COLUMNS) {
   HEADER_LOOKUP.set(strip(c.header), c.key);
   HEADER_LOOKUP.set(strip(c.key), c.key);
 }
+for (const [alias, key] of [
+  ['comment', 'comment'],
+  ['comentarios', 'comment'],
+  ['nota', 'comment'],
+  ['notas', 'comment'],
+  ['renta', 'taxWithheld'],
+  ['monto', 'grossAmount'],
+] as const)
+  HEADER_LOOKUP.set(alias, key);
 
 function toRows(list: Transaction[]) {
   return [...list]
@@ -35,7 +46,9 @@ function toRows(list: Transaction[]) {
       Frecuencia: t.frequency ?? '',
       ISSS: t.isssAmount ?? '',
       AFP: t.afpAmount ?? '',
+      Vialidad: t.vialidadAmount ?? '',
       'Renta Retenida': t.taxWithheld,
+      Comentario: t.comment ?? '',
       ID: t.id,
       Creado: t.createdAt,
     }));
@@ -47,6 +60,7 @@ function summaryRows(s: TaxSummary, year: number | 'all') {
     ['Salarios brutos', s.totalGrossSalary],
     ['(-) ISSS', s.totalISSS],
     ['(-) AFP', s.totalAFP],
+    ['Vialidad (informativo, no deducible)', s.totalVialidad],
     ['Salario neto gravado', s.netSalarySubjectToTax],
     ['Honorarios brutos', s.totalIndependentFees],
     ['Gastos médicos (facturados)', s.grossDeductibleMedical],
@@ -72,7 +86,7 @@ function legendRows() {
 export function exportXlsx(list: Transaction[], summary: TaxSummary, year: number | 'all') {
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.json_to_sheet(toRows(list), { header: COLUMNS.map((c) => c.header) });
-  ws['!cols'] = [12, 32, 20, 14, 13, 10, 10, 15, 38, 26].map((wch) => ({ wch }));
+  ws['!cols'] = [12, 32, 20, 14, 13, 10, 10, 10, 15, 36, 38, 26].map((wch) => ({ wch }));
   XLSX.utils.book_append_sheet(wb, ws, 'Transacciones');
   const sum = XLSX.utils.aoa_to_sheet(summaryRows(summary, year));
   sum['!cols'] = [{ wch: 42 }, { wch: 16 }];
@@ -100,27 +114,49 @@ export interface ImportResult {
 
 /** Lee la primera hoja (o "Transacciones") de un .xlsx/.xls/.csv. */
 export function parseWorkbook(data: ArrayBuffer): ImportResult {
-  const wb = XLSX.read(data, { type: 'array', cellDates: true, raw: false });
+  // raw: true deja los CSV como texto, para interpretar fechas y montos nosotros (evita que SheetJS adivine el formato).
+  const wb = XLSX.read(data, { type: 'array', cellDates: true, raw: true });
   const sheetName = wb.SheetNames.includes('Transacciones') ? 'Transacciones' : wb.SheetNames[0];
   if (!sheetName) return { transactions: [], errors: ['El archivo no contiene hojas.'] };
   const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(wb.Sheets[sheetName], {
     defval: '',
     raw: true,
+    blankrows: true, // mantiene la numeración de filas del archivo en los mensajes de error
   });
   return rowsToTransactions(rows);
+}
+
+/**
+ * Detecta si las fechas de texto del archivo son DD/MM/AAAA o MM/DD/AAAA (formato de Excel en inglés).
+ * Si algún segundo número es > 12 el archivo es MM/DD; si no, se asume DD/MM.
+ */
+export function detectDateOrder(values: unknown[]): DateOrder {
+  let mdy = 0;
+  let dmy = 0;
+  for (const v of values) {
+    const m = typeof v === 'string' ? v.trim().match(/^(\d{1,2})[/.-](\d{1,2})[/.-]\d{4}$/) : null;
+    if (!m) continue;
+    if (+m[2] > 12) mdy++;
+    if (+m[1] > 12) dmy++;
+  }
+  return mdy > dmy ? 'MDY' : 'DMY';
 }
 
 export function rowsToTransactions(rows: Record<string, unknown>[]): ImportResult {
   const transactions: Transaction[] = [];
   const errors: string[] = [];
-  rows.forEach((row, i) => {
+  const mappedRows = rows.map((row) => {
     const mapped: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(row)) {
       const key = HEADER_LOOKUP.get(strip(k));
       if (key) mapped[key] = typeof v === 'string' ? v.trim() : v;
     }
+    return mapped;
+  });
+  const order = detectDateOrder(mappedRows.map((r) => r.date));
+  mappedRows.forEach((mapped, i) => {
     if (Object.values(mapped).every((v) => v === '' || v === undefined)) return;
-    const r = normalizeTransaction(mapped);
+    const r = normalizeTransaction(mapped, order);
     if (r.ok) transactions.push(r.value);
     else errors.push(`Fila ${i + 2}: ${r.error}`);
   });

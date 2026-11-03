@@ -23,9 +23,9 @@
 - `FLOW`: rama por feature -> PR -> `main`
 
 ## Modelo de datos (`src/types.ts`)
-- `Transaction`: id, date (YYYY-MM-DD), concept, type, grossAmount, frequency?, isssAmount?, afpAmount?, taxWithheld, createdAt
+- `Transaction`: id, date (YYYY-MM-DD), concept, type, grossAmount, frequency?, isssAmount?, afpAmount?, vialidadAmount?, taxWithheld, comment?, createdAt
 - `TransactionType`: SALARY_FORMAL | INDEPENDENT_FEES | DEDUCTIBLE_MEDICAL | DEDUCTIBLE_EDU
-- `FrequencyType`: CATORCENAL | QUINCENAL | MENSUAL
+- `FrequencyType`: CATORCENAL | QUINCENAL | MENSUAL | UNICO (aguinaldo, bonos únicos)
 - `TaxSummary`: ver `src/types.ts`
 
 ## Reglas fiscales (`src/lib/tax.ts`)
@@ -40,4 +40,5 @@
 - `R-TAX-02`: Renta imponible = salario neto + honorarios − médicos (máx $800) − educativos (máx $800), mínimo 0
 - `R-TAX-03`: Saldo = impuesto − total retenido (>0 pagar, <0 devolución)
 - `R-TAX-04`: ISSS sugerido 3% con tope salario $1,000/mes ($30/mes); AFP sugerido 7.25% sin tope. Ambos editables.
+- `R-TAX-06`: Vialidad se registra y totaliza (`totalVialidad`) pero NO reduce la renta imponible
 - `R-TAX-05`: Resumen por ejercicio fiscal (año de `date`), selector "Todos los años" disponible.

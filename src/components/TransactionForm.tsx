@@ -20,7 +20,9 @@ interface FormState {
   frequency: FrequencyType;
   isssAmount: string;
   afpAmount: string;
+  vialidadAmount: string;
   taxWithheld: string;
+  comment: string;
   autoSS: boolean;
 }
 
@@ -32,7 +34,9 @@ const emptyState = (prev?: FormState): FormState => ({
   frequency: prev?.frequency ?? 'MENSUAL',
   isssAmount: '',
   afpAmount: '',
+  vialidadAmount: '',
   taxWithheld: '',
+  comment: '',
   autoSS: true,
 });
 
@@ -44,7 +48,9 @@ const fromTx = (t: Transaction): FormState => ({
   frequency: t.frequency ?? 'MENSUAL',
   isssAmount: t.isssAmount !== undefined ? String(t.isssAmount) : '',
   afpAmount: t.afpAmount !== undefined ? String(t.afpAmount) : '',
+  vialidadAmount: t.vialidadAmount ? String(t.vialidadAmount) : '',
   taxWithheld: String(t.taxWithheld),
+  comment: t.comment ?? '',
   autoSS: false,
 });
 
@@ -87,7 +93,7 @@ export default function TransactionForm({ editing, onSave, onCancelEdit }: Props
     if (!f.date) return setError('Ingresa la fecha.');
     if (!Number.isFinite(gross) || gross <= 0) return setError('El monto bruto debe ser mayor que $0.00.');
     const withheld = isDeductible ? 0 : num(f.taxWithheld);
-    if (withheld < 0 || num(f.isssAmount) < 0 || num(f.afpAmount) < 0)
+    if (withheld < 0 || num(f.isssAmount) < 0 || num(f.afpAmount) < 0 || num(f.vialidadAmount) < 0)
       return setError('Los montos no pueden ser negativos.');
 
     const tx: Transaction = {
@@ -99,10 +105,12 @@ export default function TransactionForm({ editing, onSave, onCancelEdit }: Props
       grossAmount: round2(gross),
       taxWithheld: round2(withheld),
     };
+    if (f.comment.trim()) tx.comment = f.comment.trim();
     if (isSalary) {
       tx.frequency = f.frequency;
       tx.isssAmount = round2(num(f.isssAmount));
       tx.afpAmount = round2(num(f.afpAmount));
+      if (num(f.vialidadAmount) > 0) tx.vialidadAmount = round2(num(f.vialidadAmount));
     }
     onSave(tx);
     setError(null);
@@ -229,13 +237,37 @@ export default function TransactionForm({ editing, onSave, onCancelEdit }: Props
                 placeholder="0.00"
               />
             </Field>
-            <div className="flex items-end">
+            <Field label="Vialidad ($)" hint="Informativo, no se deduce de la renta.">
+              <input
+                type="number"
+                inputMode="decimal"
+                min="0"
+                step="0.01"
+                className={inputCls}
+                value={f.vialidadAmount}
+                onChange={(e) => set('vialidadAmount', e.target.value)}
+                placeholder="0.00"
+              />
+            </Field>
+            <div className="flex items-end sm:col-span-2">
               <button type="button" className={`${btn.secondary} w-full`} onClick={applySuggestion}>
                 <Wand2 className="size-4" /> Recalcular ISSS / AFP
               </button>
             </div>
           </>
         )}
+
+        <div className="sm:col-span-2">
+          <Field label="Comentario (opcional)">
+            <input
+              className={inputCls}
+              value={f.comment}
+              onChange={(e) => set('comment', e.target.value)}
+              placeholder="Ej. Bono, aguinaldo, ajuste de vacaciones"
+              maxLength={500}
+            />
+          </Field>
+        </div>
 
         {error && (
           <p role="alert" className="text-sm text-red-600 sm:col-span-2 dark:text-red-400">

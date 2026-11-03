@@ -64,6 +64,12 @@ export default function SummaryPanel({ summary: s, year }: { summary: TaxSummary
         <Row label="ISSS" value={s.totalISSS} negative />
         <Row label="AFP" value={s.totalAFP} negative />
         <Row label="Salario neto gravado" value={s.netSalarySubjectToTax} strong />
+        {s.totalVialidad > 0 && (
+          <p className="flex justify-between py-1 text-xs text-slate-500">
+            <span>Vialidad pagada (no deducible)</span>
+            <span className="tabular-nums">{money(s.totalVialidad)}</span>
+          </p>
+        )}
         <hr className="my-2 border-slate-200 dark:border-slate-800" />
         <Row label="Honorarios brutos" value={s.totalIndependentFees} strong />
         <hr className="my-2 border-slate-200 dark:border-slate-800" />

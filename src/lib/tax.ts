@@ -35,6 +35,7 @@ export const PERIODS_PER_YEAR: Record<FrequencyType, number> = {
   MENSUAL: 12,
   QUINCENAL: 24,
   CATORCENAL: 26,
+  UNICO: 12, // pagos únicos (aguinaldo, bonos): se usa el tope mensual de ISSS
 };
 
 export function findBracket(taxableIncome: number): TaxBracket {
@@ -69,6 +70,7 @@ export function computeSummary(transactions: Transaction[]): TaxSummary {
   let totalGrossSalary = 0;
   let totalISSS = 0;
   let totalAFP = 0;
+  let totalVialidad = 0;
   let totalIndependentFees = 0;
   let grossDeductibleMedical = 0;
   let grossDeductibleEdu = 0;
@@ -81,6 +83,7 @@ export function computeSummary(transactions: Transaction[]): TaxSummary {
         totalGrossSalary += amount;
         totalISSS += Number(t.isssAmount) || 0;
         totalAFP += Number(t.afpAmount) || 0;
+        totalVialidad += Number(t.vialidadAmount) || 0;
         break;
       case 'INDEPENDENT_FEES':
         totalIndependentFees += amount;
@@ -108,6 +111,7 @@ export function computeSummary(transactions: Transaction[]): TaxSummary {
     totalGrossSalary: round2(totalGrossSalary),
     totalISSS: round2(totalISSS),
     totalAFP: round2(totalAFP),
+    totalVialidad: round2(totalVialidad),
     netSalarySubjectToTax: round2(netSalarySubjectToTax),
     totalIndependentFees: round2(totalIndependentFees),
     grossDeductibleMedical: round2(grossDeductibleMedical),

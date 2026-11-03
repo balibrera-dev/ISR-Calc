@@ -1,4 +1,4 @@
-export type FrequencyType = 'CATORCENAL' | 'QUINCENAL' | 'MENSUAL';
+export type FrequencyType = 'CATORCENAL' | 'QUINCENAL' | 'MENSUAL' | 'UNICO';
 
 export type TransactionType =
   | 'SALARY_FORMAL' // Salario en planilla (relación de dependencia)
@@ -17,8 +17,10 @@ export interface Transaction {
   frequency?: FrequencyType;
   isssAmount?: number;
   afpAmount?: number;
+  vialidadAmount?: number; // Contribución de vialidad retenida en planilla (no deducible de renta)
 
   taxWithheld: number;
+  comment?: string; // Nota libre del usuario
   createdAt: string;
 }
 
@@ -26,6 +28,7 @@ export interface TaxSummary {
   totalGrossSalary: number;
   totalISSS: number;
   totalAFP: number;
+  totalVialidad: number; // Informativo: no afecta la renta imponible
   netSalarySubjectToTax: number;
 
   totalIndependentFees: number;
@@ -53,6 +56,7 @@ export const FREQUENCY_LABELS: Record<FrequencyType, string> = {
   CATORCENAL: 'Catorcenal',
   QUINCENAL: 'Quincenal',
   MENSUAL: 'Mensual',
+  UNICO: 'Pago único',
 };
 
 export const isIncome = (t: TransactionType) => t === 'SALARY_FORMAL' || t === 'INDEPENDENT_FEES';
