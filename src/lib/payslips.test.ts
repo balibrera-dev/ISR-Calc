@@ -67,3 +67,20 @@ describe('payslipAlerts on an unfinished year', () => {
     expect(a[0].detail).toContain('$1,200.00');
   });
 });
+
+describe('payslipAlerts with two employers', () => {
+  it('applies the $30 ISSS cap per employer and explains the missing withholding', () => {
+    const main = cleanYear().map((t) => ({ ...t, concept: 'CONCENTRIX CVG GLOBAL S.A.' }));
+    const temp = ['07', '08', '09'].map((m) => sal(`2024-${m}-30`, 330, { concept: 'PlanixPro Solutions', isssAmount: 9.9, afpAmount: 23.93 }));
+    const a = check([...main, ...temp]);
+    expect(a.map((x) => x.title)).toEqual(['Dos empleadores: falta renta por retener']);
+  });
+
+  it('still flags more than $30 in a month with the same employer', () => {
+    const list = cleanYear().map((t) => ({ ...t, concept: 'Empresa A' }));
+    list.push(sal('2024-03-15', 500, { concept: 'Empresa A', isssAmount: 15, afpAmount: 36.25 }));
+    list.push(sal('2024-03-20', 330, { concept: 'Empresa B', isssAmount: 9.9, afpAmount: 23.93 }));
+    const isss = check(list).find((x) => x.title === 'ISSS cobrado de más');
+    expect(isss?.items).toEqual(['mar 2024 · Empresa A: $45.00 (máx. $30.00)']);
+  });
+});
