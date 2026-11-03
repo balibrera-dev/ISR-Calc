@@ -15,6 +15,12 @@
 - Si llenas años de servicio y salario mensual base, la app calcula el tope y grava solo el excedente. Si los dejas vacíos, la toma como exenta completa.
 - Lo demás de la liquidación va aparte: vacaciones proporcionales como salario, aguinaldo proporcional como Aguinaldo.
 
+## Negocio propio y alquileres
+- **Ventas de negocio propio:** el total vendido (puede ser por mes). En "Pago a cuenta pagado" anota lo que pagaste en el F14 (1.75% de las ventas).
+- **Alquiler cobrado:** el total cobrado por alquilar un inmueble.
+- **Costo o gasto de negocio/alquiler:** facturas de lo que gastaste para vender o mantener el inmueble. Se restan de ventas y alquileres; si no tienes el detalle, puedes poner directamente tu ganancia como venta.
+- Cada año muestra avisos: si pierdes la deducción de $1,600, si te toca inscribirte en IVA y si te falta pago a cuenta.
+
 ## Importar / exportar
 - Exportar: **Excel** con todas las transacciones + una hoja `Resumen AAAA` por año + Códigos; **CSV** con todas las transacciones. Úsalo como respaldo (los datos viven solo en el navegador).
 - Importar `.xlsx` / `.csv`. Columnas: `Fecha, Concepto, Tipo, Monto Bruto, Frecuencia, ISSS, AFP, Vialidad, Renta Retenida, Comentario, ID, Creado` (también acepta `Comment`).

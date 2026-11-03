@@ -77,6 +77,9 @@ export function computeSummary(transactions: Transaction[], year?: number): TaxS
   let totalVialidad = 0;
   let totalIndependentFees = 0;
   let totalIndemnizacion = 0;
+  let totalBusinessIncome = 0;
+  let totalRentalIncome = 0;
+  let totalBusinessExpense = 0;
   let exemptIndemnizacion = 0;
   let grossDeductibleMedical = 0;
   let grossDeductibleEdu = 0;
@@ -100,6 +103,15 @@ export function computeSummary(transactions: Transaction[], year?: number): TaxS
         exemptIndemnizacion += cap === null ? amount : Math.min(amount, cap);
         break;
       }
+      case 'BUSINESS_INCOME':
+        totalBusinessIncome += amount;
+        break;
+      case 'RENTAL_INCOME':
+        totalRentalIncome += amount;
+        break;
+      case 'BUSINESS_EXPENSE':
+        totalBusinessExpense += amount;
+        break;
       case 'INDEPENDENT_FEES':
         totalIndependentFees += amount;
         break;
@@ -123,9 +135,13 @@ export function computeSummary(transactions: Transaction[], year?: number): TaxS
   const taxableAguinaldo = totalAguinaldo - exemptAguinaldo;
   const taxableIndemnizacion = totalIndemnizacion - exemptIndemnizacion;
   const netSalarySubjectToTax = Math.max(0, totalGrossSalary - totalISSS - totalAFP);
+  // Negocio y alquiler: tributa la ganancia. Una pérdida no reduce el salario.
+  const netOtherIncome = Math.max(0, totalBusinessIncome + totalRentalIncome - totalBusinessExpense);
+  const hasOtherIncome = totalBusinessIncome + totalRentalIncome > 0;
   // Art. 29 num. 7: solo salarios y ≤ $9,100 → deducción fija de $1,600 (en lugar de médicos/educativos).
   const qualifiesFixed =
     totalIndependentFees === 0 &&
+    !hasOtherIncome &&
     totalGrossSalary + totalAguinaldo > 0 &&
     totalGrossSalary + taxableAguinaldo + taxableIndemnizacion <= rules.fixedSalaryDeductionLimit;
   const fixedSalaryDeduction = qualifiesFixed ? rules.fixedSalaryDeduction : 0;
@@ -136,7 +152,8 @@ export function computeSummary(transactions: Transaction[], year?: number): TaxS
     netSalarySubjectToTax +
       taxableAguinaldo +
       taxableIndemnizacion +
-      totalIndependentFees -
+      totalIndependentFees +
+      netOtherIncome -
       fixedSalaryDeduction -
       appliedDeductibleMedical -
       appliedDeductibleEdu,
@@ -157,6 +174,10 @@ export function computeSummary(transactions: Transaction[], year?: number): TaxS
     fixedSalaryDeduction,
     netSalarySubjectToTax: round2(netSalarySubjectToTax),
     totalIndependentFees: round2(totalIndependentFees),
+    totalBusinessIncome: round2(totalBusinessIncome),
+    totalRentalIncome: round2(totalRentalIncome),
+    totalBusinessExpense: round2(totalBusinessExpense),
+    netOtherIncome: round2(netOtherIncome),
     grossDeductibleMedical: round2(grossDeductibleMedical),
     appliedDeductibleMedical: round2(appliedDeductibleMedical),
     grossDeductibleEdu: round2(grossDeductibleEdu),

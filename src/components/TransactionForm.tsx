@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Plus, Save, Wand2 } from 'lucide-react';
 import type { FrequencyType, Transaction, TransactionType } from '../types';
-import { FREQUENCY_LABELS, TRANSACTION_TYPE_LABELS } from '../types';
+import { FREQUENCY_LABELS, TRANSACTION_TYPE_LABELS, isExpense } from '../types';
 import { indemnizacionCap, round2, suggestSocialSecurity } from '../lib/tax';
 import { aguinaldoRuleFor } from '../lib/rules';
 import { money } from '../lib/format';
@@ -83,7 +83,9 @@ export default function TransactionForm({ editing, defaultDate, onSave, onCancel
   }, [editing]);
 
   const isSalary = f.type === 'SALARY_FORMAL';
-  const isDeductible = f.type === 'DEDUCTIBLE_MEDICAL' || f.type === 'DEDUCTIBLE_EDU';
+  const isDeductible = isExpense(f.type);
+  const isBusiness = f.type === 'BUSINESS_INCOME';
+  const isRental = f.type === 'RENTAL_INCOME';
   const isAguinaldo = f.type === 'AGUINALDO';
   const isIndemnizacion = f.type === 'INDEMNIZACION';
 
@@ -143,7 +145,15 @@ export default function TransactionForm({ editing, defaultDate, onSave, onCancel
   };
 
   const conceptLabel =
-    isSalary || isAguinaldo || isIndemnizacion ? 'Empleador' : f.type === 'INDEPENDENT_FEES' ? 'Cliente / concepto' : 'Proveedor / concepto';
+    isSalary || isAguinaldo || isIndemnizacion
+      ? 'Empleador'
+      : f.type === 'INDEPENDENT_FEES'
+        ? 'Cliente / concepto'
+        : isBusiness
+          ? 'Concepto (ej. ventas de marzo)'
+          : isRental
+            ? 'Inquilino / inmueble'
+            : 'Proveedor / concepto';
   const agYear = Number(f.date.slice(0, 4)) || new Date().getFullYear();
   const agRule = aguinaldoRuleFor(agYear);
   const indCap = indemnizacionCap({ serviceYears: num(f.serviceYears), baseSalary: num(f.baseSalary) });
@@ -207,8 +217,18 @@ export default function TransactionForm({ editing, defaultDate, onSave, onCancel
           </Field>
         ) : !isDeductible ? (
           <Field
-            label="Renta retenida ($)"
-            hint={isAguinaldo ? agHint : isIndemnizacion ? indHint : 'Usualmente 10% en servicios profesionales.'}
+            label={isBusiness ? 'Pago a cuenta pagado ($)' : 'Renta retenida ($)'}
+            hint={
+              isAguinaldo
+                ? agHint
+                : isIndemnizacion
+                  ? indHint
+                  : isBusiness
+                    ? `F14: 1.75% de las ventas = ${money(round2(num(f.grossAmount) * 0.0175))}. Se resta en el F11.`
+                    : isRental
+                      ? 'Si quien te alquila te retuvo renta, anótala aquí.'
+                      : 'Usualmente 10% en servicios profesionales.'
+            }
           >
             <input
               type="number"
@@ -223,7 +243,9 @@ export default function TransactionForm({ editing, defaultDate, onSave, onCancel
           </Field>
         ) : (
           <p className="self-end pb-2 text-xs text-slate-500">
-            Se deduce hasta $800.00 anuales por cada categoría (médico y educativo).
+            {f.type === 'BUSINESS_EXPENSE'
+              ? 'Se resta de tus ventas y alquileres. Solo gastos necesarios para el negocio o el inmueble, con factura.'
+              : 'Se deduce hasta $800.00 anuales por cada categoría (médico y educativo).'}
           </p>
         )}
 

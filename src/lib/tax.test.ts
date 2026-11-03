@@ -158,3 +158,30 @@ describe('indemnización', () => {
     expect(s.taxableIncome).toBe(15400);
   });
 });
+
+describe('negocio propio y alquileres', () => {
+  it('taxes sales + rent minus expenses and drops the $1,600 fixed deduction', () => {
+    const s = computeSummary(
+      [
+        tx({ grossAmount: 6000, date: '2026-06-30' }),
+        tx({ type: 'BUSINESS_INCOME', grossAmount: 3000, taxWithheld: 52.5 }),
+        tx({ type: 'RENTAL_INCOME', grossAmount: 1200 }),
+        tx({ type: 'BUSINESS_EXPENSE', grossAmount: 1700 }),
+      ],
+      2026,
+    );
+    expect(s.netOtherIncome).toBe(2500);
+    expect(s.fixedSalaryDeduction).toBe(0);
+    expect(s.taxableIncome).toBe(8500);
+    expect(s.totalTaxWithheld).toBe(52.5);
+  });
+
+  it('does not let a business loss reduce salary', () => {
+    const s = computeSummary(
+      [tx({ grossAmount: 12000 }), tx({ type: 'BUSINESS_INCOME', grossAmount: 500 }), tx({ type: 'BUSINESS_EXPENSE', grossAmount: 900 })],
+      2026,
+    );
+    expect(s.netOtherIncome).toBe(0);
+    expect(s.taxableIncome).toBe(12000);
+  });
+});

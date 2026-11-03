@@ -124,3 +124,18 @@ describe('indemnización import', () => {
     expect(transactions[1].serviceYears).toBeUndefined();
   });
 });
+
+describe('negocio import', () => {
+  it('maps business, rental and expense aliases and zeroes expense withholding', () => {
+    const { transactions } = rowsToTransactions([
+      { Fecha: '2026-03-31', Tipo: 'Ventas', 'Monto Bruto': 500, 'Renta Retenida': 8.75 },
+      { Fecha: '2026-03-31', Tipo: 'Alquiler', 'Monto Bruto': 300 },
+      { Fecha: '2026-03-31', Tipo: 'Gasto', 'Monto Bruto': 120, 'Renta Retenida': 5 },
+    ]);
+    expect(transactions.map((t) => [t.type, t.taxWithheld])).toEqual([
+      ['BUSINESS_INCOME', 8.75],
+      ['RENTAL_INCOME', 0],
+      ['BUSINESS_EXPENSE', 0],
+    ]);
+  });
+});

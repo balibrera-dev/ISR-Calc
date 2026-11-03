@@ -63,6 +63,11 @@ const SRC = {
     label: 'Guía de declaración F11 (Ministerio de Hacienda)',
     url: 'https://www.mh.gob.sv/wp-content/uploads/2020/11/PMHDC8220.pdf',
   },
+  f14: {
+    label: 'Formulario F14 paso a paso (Facxi)',
+    url: 'https://facxi.com/blog/formulario-f14-pago-a-cuenta-retenciones-el-salvador',
+  },
+  iva28: { label: 'Art. 28 Ley de IVA', url: 'https://hazconta.com/leyes/ley-de-iva/art-28' },
   art4: { label: 'Art. 4 LISR (rentas no gravables)', url: 'https://hazconta.com/leyes/ley-de-renta/art-4' },
   aguinaldoHistoria: {
     label: 'Historia de la exención del aguinaldo (El Mundo)',
@@ -116,6 +121,26 @@ const BASE_NOTES: LegalNote[] = [
     detail:
       'No paga renta hasta 30 días de salario básico por cada año de servicio (salario promedio de los últimos 12 meses). La indemnización legal completa cabe en ese tope. Las vacaciones proporcionales de la liquidación sí son salario gravado, y el aguinaldo proporcional va como Aguinaldo.',
     source: SRC.art4,
+  },
+  {
+    kind: 'ley',
+    title: 'Negocio propio y alquileres (Arts. 28–29 LISR)',
+    detail:
+      'Tributa la ganancia: ventas o alquileres menos los costos y gastos necesarios, con factura. Se suma al salario en el mismo F11 y, al no ser todo salario, se pierde la deducción fija de $1,600.',
+  },
+  {
+    kind: 'ley',
+    title: 'Pago a cuenta (Art. 151 Código Tributario)',
+    detail:
+      'Las personas naturales con negocio declaran cada mes en el F14 el 1.75% de sus ventas brutas. Lo pagado se resta del impuesto en el F11. Hay tasas especiales (0.3%) para algunas actividades.',
+    source: SRC.f14,
+  },
+  {
+    kind: 'ley',
+    title: 'Inscripción en IVA (Art. 28 Ley de IVA)',
+    detail:
+      'Debes inscribirte si en los últimos 12 meses vendiste $5,714.29 o más (¢50,000), o si tus activos llegan a $2,285.71 (¢20,000). Cuentan las ventas gravadas y exentas.',
+    source: SRC.iva28,
   },
   {
     kind: 'ley',

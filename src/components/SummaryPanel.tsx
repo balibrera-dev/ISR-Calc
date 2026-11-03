@@ -100,6 +100,24 @@ export default function SummaryPanel({ summary: s, rules }: { summary: TaxSummar
           </>
         )}
         <Row label="Honorarios brutos" value={s.totalIndependentFees} strong />
+        {s.totalBusinessIncome + s.totalRentalIncome + s.totalBusinessExpense > 0 && (
+          <>
+            <hr className="my-2 border-slate-200 dark:border-slate-800" />
+            {s.totalBusinessIncome > 0 && <Row label="Ventas de negocio" value={s.totalBusinessIncome} />}
+            {s.totalRentalIncome > 0 && <Row label="Alquileres cobrados" value={s.totalRentalIncome} />}
+            <Row label="Costos y gastos con factura" value={s.totalBusinessExpense} negative />
+            <Row
+              label="Ganancia de negocio y alquiler"
+              sub={
+                s.totalBusinessExpense > s.totalBusinessIncome + s.totalRentalIncome
+                  ? 'Pérdida: no reduce tu salario'
+                  : undefined
+              }
+              value={s.netOtherIncome}
+              strong
+            />
+          </>
+        )}
         <hr className="my-2 border-slate-200 dark:border-slate-800" />
         <Row
           label="Gastos médicos"

@@ -1,5 +1,5 @@
 import type { FrequencyType, Transaction, TransactionType } from '../types';
-import { FREQUENCY_LABELS, TRANSACTION_TYPE_LABELS } from '../types';
+import { FREQUENCY_LABELS, TRANSACTION_TYPE_LABELS, isExpense } from '../types';
 import { round2 } from './tax';
 import { newId } from './format';
 
@@ -11,6 +11,17 @@ const strip = (s: string) =>
 
 const TYPE_ALIASES: Record<string, TransactionType> = {
   aguinaldo: 'AGUINALDO',
+  ventas: 'BUSINESS_INCOME',
+  venta: 'BUSINESS_INCOME',
+  negocio: 'BUSINESS_INCOME',
+  'ventas de negocio propio': 'BUSINESS_INCOME',
+  alquiler: 'RENTAL_INCOME',
+  'alquiler cobrado': 'RENTAL_INCOME',
+  arrendamiento: 'RENTAL_INCOME',
+  gasto: 'BUSINESS_EXPENSE',
+  costo: 'BUSINESS_EXPENSE',
+  'gasto de negocio': 'BUSINESS_EXPENSE',
+  'costo o gasto de negocio/alquiler': 'BUSINESS_EXPENSE',
   indemnizacion: 'INDEMNIZACION',
   'indemnizacion por despido': 'INDEMNIZACION',
   despido: 'INDEMNIZACION',
@@ -122,7 +133,7 @@ export function normalizeTransaction(
     concept: String(raw.concept ?? '').trim(),
     type,
     grossAmount: round2(gross),
-    taxWithheld: type === 'DEDUCTIBLE_MEDICAL' || type === 'DEDUCTIBLE_EDU' ? 0 : round2(withheld),
+    taxWithheld: isExpense(type) ? 0 : round2(withheld),
     ...(String(raw.comment ?? '').trim() ? { comment: String(raw.comment).trim().slice(0, 500) } : {}),
     createdAt: typeof raw.createdAt === 'string' && raw.createdAt ? raw.createdAt : new Date().toISOString(),
   };

@@ -5,6 +5,9 @@ export type TransactionType =
   | 'INDEPENDENT_FEES' // Honorarios / servicios profesionales
   | 'AGUINALDO' // Aguinaldo: exento hasta el tope del año, el excedente es gravado
   | 'INDEMNIZACION' // Indemnización por despido / retiro: exenta hasta 30 días de salario por año de servicio
+  | 'BUSINESS_INCOME' // Ventas / ingresos de negocio propio
+  | 'RENTAL_INCOME' // Alquiler cobrado
+  | 'BUSINESS_EXPENSE' // Costo o gasto con factura del negocio o del inmueble alquilado
   | 'DEDUCTIBLE_MEDICAL' // Deducción por gastos médicos
   | 'DEDUCTIBLE_EDU'; // Deducción por gastos educativos
 
@@ -46,6 +49,11 @@ export interface TaxSummary {
 
   totalIndependentFees: number;
 
+  totalBusinessIncome: number; // Ventas del negocio
+  totalRentalIncome: number; // Alquileres cobrados
+  totalBusinessExpense: number; // Costos y gastos con factura
+  netOtherIncome: number; // Negocio + alquiler − gastos (mínimo 0)
+
   grossDeductibleMedical: number;
   appliedDeductibleMedical: number;
 
@@ -63,6 +71,9 @@ export const TRANSACTION_TYPE_LABELS: Record<TransactionType, string> = {
   INDEPENDENT_FEES: 'Honorarios / servicios profesionales',
   AGUINALDO: 'Aguinaldo',
   INDEMNIZACION: 'Indemnización por despido',
+  BUSINESS_INCOME: 'Ventas de negocio propio',
+  RENTAL_INCOME: 'Alquiler cobrado',
+  BUSINESS_EXPENSE: 'Costo o gasto de negocio/alquiler',
   DEDUCTIBLE_MEDICAL: 'Gasto médico deducible',
   DEDUCTIBLE_EDU: 'Gasto educativo deducible',
 };
@@ -75,4 +86,13 @@ export const FREQUENCY_LABELS: Record<FrequencyType, string> = {
 };
 
 export const isIncome = (t: TransactionType) =>
-  t === 'SALARY_FORMAL' || t === 'INDEPENDENT_FEES' || t === 'AGUINALDO' || t === 'INDEMNIZACION';
+  t === 'SALARY_FORMAL' ||
+  t === 'INDEPENDENT_FEES' ||
+  t === 'AGUINALDO' ||
+  t === 'INDEMNIZACION' ||
+  t === 'BUSINESS_INCOME' ||
+  t === 'RENTAL_INCOME';
+
+/** Tipos que no llevan renta retenida (gastos). */
+export const isExpense = (t: TransactionType) =>
+  t === 'DEDUCTIBLE_MEDICAL' || t === 'DEDUCTIBLE_EDU' || t === 'BUSINESS_EXPENSE';
